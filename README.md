@@ -1,10 +1,10 @@
-The beauty of BANano is that it enables one to use any front-end framework they want. This means that you can pick any framework like Bootstrap, VueJS, Pure, Bulma, Skeleton etc to use.
+**Why the BANano Custom View Creator?**
+
+The beauty of [BANano](https://www.b4x.com/android/forum/threads/banano-website-app-pwa-library-with-abstract-designer-support.99740/#content) is that it enables one to use any front-end framework they want. This means that you can pick any framework like Bootstrap, VueJS, Pure, Bulma, Skeleton etc to use.
 
 Luckily, the Skeleton framework comes built in and I have done some interesting wraps too along VueJS. VueJS on the other hand meant that set BANano terms and conditions were broken to make it work. With that said, a proud moment with a lot of pleasure is realising this project.
 
 The BANano Custom View Creator is built using the BANanoVueDesigner i.e. VueJS+Vuetify on top of BANano. I opted for that approach because the designer generates most of the source code needed for CRUD. For the backend MySQL is being used. So the less code that was written to make this work was the advantage.
-
-**Why the BANano Custom View Creator?**
 
 If you don't want to use the built in BANanoSkeleton library, and for example need to use Bootstrap for your BANano Website / WebApp, you need to create custom views built following BANano's outline that will use Bootstrap. At least building the Bootstrap library will be done once. Hopefully when someone does that, they can make it available here in the forum. ;)
 
