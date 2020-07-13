@@ -19,6 +19,7 @@ To demonstrate this, we have gone to the basics, we will take a basic anchor tag
 *Let's watch a video a little so we can get our heads around this concept.*
 
 [BANano Custom View Creator on YouTube - Part 1 (Attributes)](https://youtu.be/3JZHLlq8bLo)
+
 [BANano Custom View Creator on YouTube - Part 2 (Styles)](https://youtu.be/WDfGkes5RAc)
 
 **Running the WebApp Locally**
