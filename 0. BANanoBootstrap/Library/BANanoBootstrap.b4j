@@ -1,0 +1,129 @@
+﻿AppType=JavaFX
+Build1=Default,com.ab.skeleton
+File1=bootstrap.min.css
+File10=fontawesome-webfont.woff2
+File11=jquery-3.5.1.slim.min.js
+File12=popper.min.js
+File13=roboto.min.css
+File14=roboto-v20-latin-500.eot
+File15=roboto-v20-latin-500.svg
+File16=roboto-v20-latin-500.ttf
+File17=roboto-v20-latin-500.woff
+File18=roboto-v20-latin-500.woff2
+File19=roboto-v20-latin-700.eot
+File2=bootstrap.min.js
+File20=roboto-v20-latin-700.svg
+File21=roboto-v20-latin-700.ttf
+File22=roboto-v20-latin-700.woff
+File23=roboto-v20-latin-700.woff2
+File24=roboto-v20-latin-italic.eot
+File25=roboto-v20-latin-italic.svg
+File26=roboto-v20-latin-italic.ttf
+File27=roboto-v20-latin-italic.woff
+File28=roboto-v20-latin-italic.woff2
+File29=roboto-v20-latin-regular.eot
+File3=fileSaver.min.js
+File30=roboto-v20-latin-regular.svg
+File31=roboto-v20-latin-regular.ttf
+File32=roboto-v20-latin-regular.woff
+File33=roboto-v20-latin-regular.woff2
+File34=upload.php
+File4=fontawesome.min.css
+File5=FontAwesome.otf
+File6=fontawesome-webfont.eot
+File7=fontawesome-webfont.svg
+File8=fontawesome-webfont.ttf
+File9=fontawesome-webfont.woff
+FileGroup1=Default Group
+FileGroup10=Default Group
+FileGroup11=Default Group
+FileGroup12=Default Group
+FileGroup13=Default Group
+FileGroup14=Default Group
+FileGroup15=Default Group
+FileGroup16=Default Group
+FileGroup17=Default Group
+FileGroup18=Default Group
+FileGroup19=Default Group
+FileGroup2=Default Group
+FileGroup20=Default Group
+FileGroup21=Default Group
+FileGroup22=Default Group
+FileGroup23=Default Group
+FileGroup24=Default Group
+FileGroup25=Default Group
+FileGroup26=Default Group
+FileGroup27=Default Group
+FileGroup28=Default Group
+FileGroup29=Default Group
+FileGroup3=Default Group
+FileGroup30=Default Group
+FileGroup31=Default Group
+FileGroup32=Default Group
+FileGroup33=Default Group
+FileGroup34=Default Group
+FileGroup4=Default Group
+FileGroup5=Default Group
+FileGroup6=Default Group
+FileGroup7=Default Group
+FileGroup8=Default Group
+FileGroup9=Default Group
+Group=Default Group
+Library1=jcore
+Library2=jfx
+Library3=banano
+Module1=|absolute|C:\Users\anelembanga\Documents\MEGA\MyApps\b4j\Shared\BANanoShared
+Module2=TBAlert
+NumberOfFiles=34
+NumberOfLibraries=3
+NumberOfModules=2
+Version=8.5
+@EndOfDesignText@
+#Region Project Attributes 
+	#MainFormWidth: 600
+	#MainFormHeight: 600 
+	#IgnoreWarnings: 16, 10, 14, 15	
+	#LibraryAuthor: Anele Mbanga (Mashy)
+	#LibraryVersion: 1.00
+#End Region
+
+Sub Process_Globals
+	Private BANano As BANano 'ignore	
+	Private Version As String = "1.00"
+	Private LibName As String = "BANanoBootstrap"			
+	Private LibTitle As String = "BANano Twitter Bootstrap"
+End Sub
+
+Sub AppStart (Form1 As Form, Args() As String)	
+	' you can change some output params here
+	BANano.Initialize("BANano", LibName, Version)
+	BANano.Header.Title = LibTitle
+	
+	BANano.Header.AddCSSFile("fontawesome.min.css")
+	BANano.Header.AddCSSFile("roboto.min.css")
+	BANano.Header.AddCSSFile("bootstrap.min.css")
+	'
+	BANano.Header.AddJavascriptFile("fileSaver.min.js")
+	BANano.Header.AddJavascriptFile("jquery-3.5.1.slim.min.js")
+	BANano.Header.AddJavascriptFile("popper.min.js")
+	BANano.Header.AddJavascriptFile("bootstrap.min.js")
+				
+	' start the build
+	#if release
+		BANano.BuildAsB4Xlib(Version)
+	#else
+		BANano.Build(File.DirApp)
+	#end if
+	
+	ExitApplication
+End Sub
+
+'Return true to allow the default exceptions handler to handle the uncaught exception.
+Sub Application_Error (Error As Exception, StackTrace As String) As Boolean
+	Return True
+End Sub
+
+' HERE STARTS YOUR APP
+Sub BANano_Ready()
+	
+End Sub

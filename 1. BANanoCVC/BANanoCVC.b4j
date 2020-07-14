@@ -1,0 +1,218 @@
+﻿AppType=JavaFX
+Build1=Default,b4j.example
+File1=android-chrome-192x192.png
+File10=upload.php
+File2=android-chrome-512x512.png
+File3=apple-touch-icon.png
+File4=config.php
+File5=favicon.ico
+File6=favicon-16x16.png
+File7=favicon-32x32.png
+File8=ninja.jpg
+File9=sponge.png
+FileGroup1=Default Group
+FileGroup10=Default Group
+FileGroup2=Default Group
+FileGroup3=Default Group
+FileGroup4=Default Group
+FileGroup5=Default Group
+FileGroup6=Default Group
+FileGroup7=Default Group
+FileGroup8=Default Group
+FileGroup9=Default Group
+Group=Default Group
+Library1=jcore
+Library2=jfx
+Library3=banano
+Library4=bananovuetifycore
+Library5=bananovuetifyconnect
+Library6=bananophp
+Library7=bananovuetifyprism
+Module1=clsBuilder
+Module2=pgComponent
+Module3=pgComponents
+Module4=pgIndex
+Module5=pgProjects
+NumberOfFiles=10
+NumberOfLibraries=7
+NumberOfModules=5
+Version=8.5
+@EndOfDesignText@
+#Region Project Attributes 
+	#MergeLibraries: True
+	#LibraryAuthor: Anele Mashy Mbanga
+#End Region
+
+#IgnoreWarnings:12, 15
+Sub Process_Globals
+	Public BANano As BANano 'ignore
+	Public AppName As String = "bananocvc"
+	Public AppTitle As String = "BANano Custom View Creator"
+	Private Publish As String = "C:\laragon\www"
+	Public ServerIP As String = "localhost"
+	Public Version As String = "1.00"
+	Public Port As String = "8080"
+End Sub
+
+Sub AppStart (Form1 As Form, Args() As String)
+	'post processor
+	'initialize banano for first use
+	BANano.Initialize("BANano", AppName, Version)
+	BANano.HTML_NAME = "index.html"
+	BANano.Header.Title = AppTitle
+	'
+	BANano.Header.AddFavicon("favicon-16x16.png", "16x16")
+	BANano.Header.AddAppleTouchIcon("apple-touch-icon.png", "180x180")
+	'BANano.Header.AddMSTileIcon("mstile-150x150.png", "144x144")
+	'BANano.Header.SetMaskIcon("safari-pinned-tab.svg")
+	BANano.Header.AddManifestIcon("android-chrome-192x192.png", "192x192")
+	BANano.Header.AddManifestIcon("android-chrome-512x512.png", "512x512")
+	'
+	BANano.TranspilerOptions.UseServiceWorker = False
+	BANano.transpileroptions.MergeAllCSSFiles = True
+	BANano.transpileroptions.MergeAllJavascriptFiles = True
+	BANano.TranspilerOptions.EnableLiveCodeSwapping = False
+	BANano.TranspilerOptions.RedirectOutput(File.DirApp, "log.txt")
+	'BANano.TranspilerOptions.RemoveDeadCode = True 
+	'
+	'set php settings
+	BANano.PHP_NAME = $"${AppName}.php"$
+	BANano.PHPHost = $"http://${ServerIP}:${Port}/${AppName}/"$
+	BANano.PHPAddHeader("Access-Control-Allow-Origin: *")
+	
+	BANano.Build(Publish)
+	Dim fx As JFX
+	Dim URL As String = File.GetUri(File.DirApp,"log.txt")
+	fx.ShowExternalDocument(URL)
+	'
+	Dim appPath As String = $"http://localhost/${AppName}/index.html"$
+	If Port <> "" Then appPath = $"http://localhost:${Port}/${AppName}/index.html"$
+	fx.ShowExternalDocument(appPath)
+	ExitApplication
+End Sub
+
+'Return true to allow the default exceptions handler to handle the uncaught exception.
+Sub Application_Error (Error As Exception, StackTrace As String) As Boolean
+	Return True
+End Sub
+
+Sub BANano_Ready
+	'copy code below this line
+	'*** START: CREATE TABLES
+	Dim rsProjects As BANanoMySQLE
+	'initialize table for table creation
+	rsProjects.Initialize("bananocvc", "projects", "projectid", "projectid")
+	'add each field to the schema
+	rsProjects.SchemaAddField("projectid", "INT")
+	rsProjects.SchemaAddField("projectname", "TEXT")
+	rsProjects.SchemaAddField("projectauthor", "TEXT")
+	rsProjects.SchemaAddField("projectversion", "TEXT")
+	rsProjects.SchemaAddField("projectprefix", "TEXT")
+	'generate & run command to create the table
+	rsProjects.SchemaCreateTable
+	rsProjects.JSON = BANano.CallInlinePHPWait(rsProjects.MethodName, rsProjects.Build)
+	rsProjects.FromJSON
+	'
+	Dim rsComponents As BANanoMySQLE
+	'initialize table for table creation
+	rsComponents.Initialize("bananocvc", "components", "componentid", "componentid")
+	'add each field to the schema
+	rsComponents.SchemaAddField("componentid", "INT")
+	rsComponents.SchemaAddField("projectid", "INT")
+	rsComponents.SchemaAddField("componenttag", "TEXT")
+	rsComponents.SchemaAddField("componentdescription", "TEXT")
+	'generate & run command to create the table
+	rsComponents.SchemaCreateTable
+	rsComponents.JSON = BANano.CallInlinePHPWait(rsComponents.MethodName, rsComponents.Build)
+	rsComponents.FromJSON
+	'
+	Dim rsAttributes As BANanoMySQLE
+	'initialize table for table creation
+	rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+	'add each field to the schema
+	rsAttributes.SchemaAddField("attrid", "INT")
+	rsAttributes.SchemaAddField("attrname", "TEXT")
+	rsAttributes.SchemaAddField("projectid", "INT")
+	rsAttributes.SchemaAddField("componentid", "INT")
+	rsAttributes.SchemaAddField("defaultvalue", "TEXT")
+	rsAttributes.SchemaAddField("attrtype", "TEXT")
+	rsAttributes.SchemaAddField("attrdescription", "TEXT")
+	rsAttributes.SchemaAddField("attrhasset", "TEXT")
+	rsAttributes.SchemaAddField("attrhasget", "TEXT")
+	rsAttributes.SchemaAddField("attroptions", "TEXT")
+	rsAttributes.SchemaAddField("attrmin", "TEXT")
+	rsAttributes.SchemaAddField("attrmax", "TEXT")
+	rsAttributes.SchemaAddField("attronsub", "TEXT")
+	rsAttributes.SchemaAddField("attroninit", "TEXT")
+	rsAttributes.SchemaAddField("attrdesigner", "TEXT")
+	'generate & run command to create the table
+	rsAttributes.SchemaCreateTable
+	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+	rsAttributes.FromJSON
+	'
+	Dim rsStyles As BANanoMySQLE
+	'initialize table for table creation
+	rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
+	'add each field to the schema
+	rsStyles.SchemaAddField("styleid", "INT")
+	rsStyles.SchemaAddField("stylename", "TEXT")
+	rsStyles.SchemaAddField("projectid", "INT")
+	rsStyles.SchemaAddField("componentid", "INT")
+	rsStyles.SchemaAddField("defaultvalue", "TEXT")
+	rsStyles.SchemaAddField("styletype", "TEXT")
+	rsStyles.SchemaAddField("styledescription", "TEXT")
+	rsStyles.SchemaAddField("stylehasset", "TEXT")
+	rsStyles.SchemaAddField("stylehasget", "TEXT")
+	rsStyles.SchemaAddField("styleoptions", "TEXT")
+	rsStyles.SchemaAddField("stylemin", "TEXT")
+	rsStyles.SchemaAddField("stylemax", "TEXT")
+	rsStyles.SchemaAddField("styleonsub", "TEXT")
+	rsStyles.SchemaAddField("styleoninit", "TEXT")
+	rsStyles.SchemaAddField("styledesigner", "TEXT")
+	'generate & run command to create the table
+	rsStyles.SchemaCreateTable
+	rsStyles.JSON = BANano.CallInlinePHPWait(rsStyles.MethodName, rsStyles.Build)
+	rsStyles.FromJSON
+	'
+	Dim rsClasses As BANanoMySQLE
+	'initialize table for table creation
+	rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
+	'add each field to the schema
+	rsClasses.SchemaAddField("classid", "INT")
+	rsClasses.SchemaAddField("classname", "TEXT")
+	rsClasses.SchemaAddField("projectid", "INT")
+	rsClasses.SchemaAddField("componentid", "INT")
+	rsClasses.SchemaAddField("defaultvalue", "TEXT")
+	rsClasses.SchemaAddField("classtype", "TEXT")
+	rsClasses.SchemaAddField("classdescription", "TEXT")
+	rsClasses.SchemaAddField("classhasset", "TEXT")
+	rsClasses.SchemaAddField("classhasget", "TEXT")
+	rsClasses.SchemaAddField("classoptions", "TEXT")
+	rsClasses.SchemaAddField("classmin", "TEXT")
+	rsClasses.SchemaAddField("classmax", "TEXT")
+	rsClasses.SchemaAddField("classonsub", "TEXT")
+	rsClasses.SchemaAddField("classoninit", "TEXT")
+	rsClasses.SchemaAddField("classdesigner", "TEXT")
+	'generate & run command to create the table
+	rsClasses.SchemaCreateTable
+	rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
+	rsClasses.FromJSON
+	'
+	Dim rsEvents As BANanoMySQLE
+	'initialize table for table creation
+	rsEvents.Initialize("bananocvc", "events", "eventid", "eventid")
+	'add each field to the schema
+	rsEvents.SchemaAddField("eventid", "INT")
+	rsEvents.SchemaAddField("eventname", "TEXT")
+	rsEvents.SchemaAddField("eventarguments", "TEXT")
+	rsEvents.SchemaAddField("eventactive", "TEXT")
+	rsEvents.SchemaAddField("projectid", "INT")
+	rsEvents.SchemaAddField("componentid", "INT")
+	'generate & run command to create the table
+	rsEvents.SchemaCreateTable
+	rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)
+	rsEvents.FromJSON
+
+	'*** END: CREATE TABLES
+	pgIndex.Init
+End Sub

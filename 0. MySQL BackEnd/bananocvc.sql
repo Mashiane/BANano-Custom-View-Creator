@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Jul 12, 2020 at 02:37 PM
+-- Generation Time: Jul 14, 2020 at 01:46 AM
 -- Server version: 5.7.24
 -- PHP Version: 7.2.19
 
@@ -48,6 +48,30 @@ CREATE TABLE `attributes` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `classes`
+--
+
+CREATE TABLE `classes` (
+  `classid` int(11) NOT NULL,
+  `classname` varchar(50) NOT NULL,
+  `projectid` int(11) NOT NULL,
+  `componentid` int(11) NOT NULL,
+  `defaultvalue` varchar(50) NOT NULL,
+  `classtype` varchar(20) NOT NULL,
+  `classdescription` varchar(200) NOT NULL,
+  `classhasset` varchar(5) NOT NULL,
+  `classhasget` varchar(5) NOT NULL,
+  `classoptions` varchar(255) NOT NULL,
+  `classmin` varchar(5) NOT NULL,
+  `classmax` varchar(5) NOT NULL,
+  `classonsub` varchar(5) NOT NULL,
+  `classoninit` varchar(5) NOT NULL,
+  `classdesigner` varchar(5) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `components`
 --
 
@@ -56,6 +80,21 @@ CREATE TABLE `components` (
   `projectid` int(11) NOT NULL,
   `componenttag` varchar(50) NOT NULL,
   `componentdescription` varchar(200) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `events`
+--
+
+CREATE TABLE `events` (
+  `eventid` int(11) NOT NULL,
+  `eventname` varchar(200) NOT NULL,
+  `eventarguments` varchar(255) NOT NULL,
+  `eventactive` varchar(10) NOT NULL,
+  `projectid` int(11) NOT NULL,
+  `componentid` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------
@@ -107,10 +146,22 @@ ALTER TABLE `attributes`
   ADD PRIMARY KEY (`attrid`);
 
 --
+-- Indexes for table `classes`
+--
+ALTER TABLE `classes`
+  ADD PRIMARY KEY (`classid`);
+
+--
 -- Indexes for table `components`
 --
 ALTER TABLE `components`
   ADD PRIMARY KEY (`componentid`);
+
+--
+-- Indexes for table `events`
+--
+ALTER TABLE `events`
+  ADD PRIMARY KEY (`eventid`);
 
 --
 -- Indexes for table `projects`
@@ -135,10 +186,22 @@ ALTER TABLE `attributes`
   MODIFY `attrid` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `classes`
+--
+ALTER TABLE `classes`
+  MODIFY `classid` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `components`
 --
 ALTER TABLE `components`
   MODIFY `componentid` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `events`
+--
+ALTER TABLE `events`
+  MODIFY `eventid` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `projects`
