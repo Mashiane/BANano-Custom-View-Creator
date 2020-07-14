@@ -6,24 +6,11 @@ Version=7
 @EndOfDesignText@
 'Custom BANano View class
 
-#Event: click (event As BANanoEvent)
 
 #DesignerProperty: Key: Text, DisplayName: Text, FieldType: String, DefaultValue: , Description: Text on the element
 #DesignerProperty: Key: Classes, DisplayName: Classes, FieldType: String, DefaultValue: , Description: Classes added to the HTML tag.
 #DesignerProperty: Key: Style, DisplayName: Style, FieldType: String, DefaultValue: , Description: Styles added to the HTML tag. Must be a json String.
 #DesignerProperty: Key: Attributes, DisplayName: Attributes, FieldType: String, DefaultValue: , Description: Attributes added to the HTML tag. Must be a json String.
-
-#DesignerProperty: Key: MarginBottom, DisplayName: MarginBottom, FieldType: String, DefaultValue:  , Description: 
-#DesignerProperty: Key: MarginLeft, DisplayName: MarginLeft, FieldType: String, DefaultValue:  , Description: 
-#DesignerProperty: Key: MarginRight, DisplayName: MarginRight, FieldType: String, DefaultValue:  , Description: 
-#DesignerProperty: Key: MarginTop, DisplayName: MarginTop, FieldType: String, DefaultValue:  , Description: 
-#DesignerProperty: Key: PaddingBottom, DisplayName: PaddingBottom, FieldType: String, DefaultValue:  , Description: 
-#DesignerProperty: Key: PaddingLeft, DisplayName: PaddingLeft, FieldType: String, DefaultValue:  , Description: 
-#DesignerProperty: Key: PaddingRight, DisplayName: PaddingRight, FieldType: String, DefaultValue:  , Description: 
-#DesignerProperty: Key: PaddingTop, DisplayName: PaddingTop, FieldType: String, DefaultValue:  , Description: 
-
-#DesignerProperty: Key: AlertDismissible, DisplayName: AlertDismissible, FieldType: Boolean, DefaultValue: False , Description: 
-#DesignerProperty: Key: AlertType, DisplayName: AlertType, FieldType: String, DefaultValue:  , Description: , List: alert-primary|alert-secondary|alert-success|alert-danger|alert-warning|alert-info|alert-light|alert-dark
 
 Sub Class_Globals
 Private BANano As BANano 'ignore
@@ -40,18 +27,6 @@ Private classList As Map
 Private styleList As Map
 Private attributeList As Map
 Private mTagName As String = "div"
-Private mRole As String = "alert"
-Private mMarginBottom As String = ""
-Private mMarginLeft As String = ""
-Private mMarginRight As String = ""
-Private mMarginTop As String = ""
-Private mPaddingBottom As String = ""
-Private mPaddingLeft As String = ""
-Private mPaddingRight As String = ""
-Private mPaddingTop As String = ""
-Private mAlert As String = "alert"
-Private mAlertDismissible As Boolean = False
-Private mAlertType As String = ""
 End Sub
 
 'initialize the custom view
@@ -72,30 +47,8 @@ mClasses = Props.Get("Classes")
 mAttributes = Props.Get("Attributes")
 mStyle = Props.Get("Style")
 mText = Props.Get("Text")
-mMarginBottom = Props.Get("MarginBottom")
-mMarginLeft = Props.Get("MarginLeft")
-mMarginRight = Props.Get("MarginRight")
-mMarginTop = Props.Get("MarginTop")
-mPaddingBottom = Props.Get("PaddingBottom")
-mPaddingLeft = Props.Get("PaddingLeft")
-mPaddingRight = Props.Get("PaddingRight")
-mPaddingTop = Props.Get("PaddingTop")
-mAlertDismissible = Props.Get("AlertDismissible")
-mAlertType = Props.Get("AlertType")
 End If
 
-AddAttr("role", mRole)
-AddStyle("margin-bottom", mMarginBottom)
-AddStyle("margin-left", mMarginLeft)
-AddStyle("margin-right", mMarginRight)
-AddStyle("margin-top", mMarginTop)
-AddStyle("padding-bottom", mPaddingBottom)
-AddStyle("padding-left", mPaddingLeft)
-AddStyle("padding-right", mPaddingRight)
-AddStyle("padding-top", mPaddingTop)
-AddClass(mAlert)
-AddClassOnCondition("alert-dismissible", mAlertDismissible, True)
-AddClass(mAlertType)
 AddClass(mClasses)
 setAttributes(mAttributes)
 setStyles(mStyle)
@@ -104,7 +57,6 @@ setStyles(mStyle)
 Dim strHTML As String = ToString
 mElement = mTarget.Append(strHTML).Get("#" & mName)
 'add events for the custom view, if any
-mElement.HandleEvents("click", mCallBack, mEventName & "_click")
 
 End Sub
 
@@ -281,96 +233,6 @@ End Sub
 'returns the text
 public Sub getText() As String
 Return mText
-End Sub
-
-public Sub setMarginBottom(varMarginBottom As String)
-AddStyle("margin-bottom", varMarginBottom)
-mMarginBottom = varMarginBottom
-End Sub
-
-public Sub getMarginBottom() As String
-Return mMarginBottom
-End Sub
-
-public Sub setMarginLeft(varMarginLeft As String)
-AddStyle("margin-left", varMarginLeft)
-mMarginLeft = varMarginLeft
-End Sub
-
-public Sub getMarginLeft() As String
-Return mMarginLeft
-End Sub
-
-public Sub setMarginRight(varMarginRight As String)
-AddStyle("margin-right", varMarginRight)
-mMarginRight = varMarginRight
-End Sub
-
-public Sub getMarginRight() As String
-Return mMarginRight
-End Sub
-
-public Sub setMarginTop(varMarginTop As String)
-AddStyle("margin-top", varMarginTop)
-mMarginTop = varMarginTop
-End Sub
-
-public Sub getMarginTop() As String
-Return mMarginTop
-End Sub
-
-public Sub setPaddingBottom(varPaddingBottom As String)
-AddStyle("padding-bottom", varPaddingBottom)
-mPaddingBottom = varPaddingBottom
-End Sub
-
-public Sub getPaddingBottom() As String
-Return mPaddingBottom
-End Sub
-
-public Sub setPaddingLeft(varPaddingLeft As String)
-AddStyle("padding-left", varPaddingLeft)
-mPaddingLeft = varPaddingLeft
-End Sub
-
-public Sub getPaddingLeft() As String
-Return mPaddingLeft
-End Sub
-
-public Sub setPaddingRight(varPaddingRight As String)
-AddStyle("padding-right", varPaddingRight)
-mPaddingRight = varPaddingRight
-End Sub
-
-public Sub getPaddingRight() As String
-Return mPaddingRight
-End Sub
-
-public Sub setPaddingTop(varPaddingTop As String)
-AddStyle("padding-top", varPaddingTop)
-mPaddingTop = varPaddingTop
-End Sub
-
-public Sub getPaddingTop() As String
-Return mPaddingTop
-End Sub
-
-public Sub setAlertDismissible(varAlertDismissible As Boolean)
-AddClass(varAlertDismissible)
-mAlertDismissible = varAlertDismissible
-End Sub
-
-public Sub getAlertDismissible() As Boolean
-Return mAlertDismissible
-End Sub
-
-public Sub setAlertType(varAlertType As String)
-AddClass(varAlertType)
-mAlertType = varAlertType
-End Sub
-
-public Sub getAlertType() As String
-Return mAlertType
 End Sub
 
 

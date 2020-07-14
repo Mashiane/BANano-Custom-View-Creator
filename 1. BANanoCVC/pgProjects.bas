@@ -16,6 +16,7 @@ Sub Process_Globals
 	Private cont As VMContainer
 	Private Mode As String
 	Private vue As BANanoVue
+	Private php As BANanoPHP
 End Sub
 
 Sub Code
@@ -265,6 +266,8 @@ Sub btnOkProjects_click(e As BANanoEvent)
 		vm.ShowSnackBarError(strError)
 		Return
 	End If
+	'get the project name
+	Dim sprojectname As String = Record.get("projectname")
 	'resultset variable
 	Dim rsProjects As BANanoMySQLE
 	'check mode
@@ -294,6 +297,10 @@ Sub btnOkProjects_click(e As BANanoEvent)
 	End Select
 	'hide the modal
 	dlgProjects.Hide
+	'lets create the folder to hold out custom views
+	'create the project folder
+	php.Initialize
+	BANano.CallInlinePHPWait(php.DIRECTORY_MAKE, php.BuildDirectoryMake($"./customviews/${sprojectname}"$))
 	'execute code to refresh listing for Projects
 	vm.CallMethod("SelectAll_Projects")
 End Sub

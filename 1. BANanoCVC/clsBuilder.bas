@@ -95,6 +95,11 @@ Sub CreateCustomView As String
 		Dim attronsub As String = attr.get("attronsub")
 		Dim attrtype As String = attr.get("attrtype")
 		Dim defaultvalue As String = attr.Get("defaultvalue")
+		'
+		If attrtype = "Boolean" And defaultvalue = "" Then
+			defaultvalue = "False"
+		End If
+		
 		'beautify the attribute name
 		Dim bAttrName As String = vm.BeautifyName(attrname)
 		'this is a designer property
@@ -163,6 +168,11 @@ Sub CreateCustomView As String
 		Dim styletype As String = style.get("styletype")
 		Dim defaultvalue As String = style.Get("defaultvalue")
 		'
+		If styletype = "Boolean" And defaultvalue = "" Then
+			defaultvalue = "False"
+		End If
+		
+		'
 		'beautify the attribute name
 		Dim sAttrName As String = vm.BeautifyName(stylename)
 		'this is a designer property
@@ -227,6 +237,12 @@ Sub CreateCustomView As String
 		Dim classonsub As String = class.get("classonsub")
 		Dim classtype As String = class.get("classtype")
 		Dim defaultvalue As String = class.Get("defaultvalue")
+		Dim classaddoncondition As String = class.get("classaddoncondition")
+		'
+		If classtype = "Boolean" And defaultvalue = "" Then
+			defaultvalue = "False"
+		End If
+		
 		'
 		'beautify the class name
 		Dim cAttrName As String = vm.BeautifyName(classname)
@@ -244,8 +260,18 @@ Sub CreateCustomView As String
 		DP.append(CRLF)
 		'define variable declaration
 		VD.append($"Private m${cAttrName} As ${classtype}"$)
-		'add the class for building
-		AddCode(AA, $"AddClass(m${cAttrName})"$)
+		Select Case classtype
+		Case "String", "Int"
+			'add the class for building
+			AddCode(AA, $"AddClass(m${cAttrName})"$)
+		Case "Boolean"
+			Select Case classaddoncondition
+			Case "True", "False"
+				AddCode(AA, $"AddClassOnCondition("${classname}", m${cAttrName}, ${classaddoncondition})"$)
+			Case "None"
+				AddCode(AA, $"AddClass("${classname}")"$)
+			End Select
+		End Select
 		'
 		Select Case classtype
 			Case "String"
@@ -399,6 +425,21 @@ Sub CreateCustomView As String
 	AddNewLine(CV)
 	AddComment(CV, "add a class")
 	AddCode(CV, $"public Sub AddClass(varClass As String)"$)
+	AddCode(CV, $"If BANano.IsUndefined(varClass) Or BANano.IsNull(varClass) Then Return"$)
+	AddCode(CV, $"If BANano.IsNumber(varClass) Then varClass = BANanoShared.CStr(varClass)"$)
+	AddCode(CV, $"varClass = varClass.trim"$)
+	AddCode(CV, $"if varClass = "" Then Return"$)
+	AddCode(CV, $"If mElement <> Null Then mElement.AddClass(varClass)"$)
+	AddCode(CV, $"Dim mItems As List = BANanoShared.StrParse(" ", varClass)"$)
+	AddCode(CV, $"For Each mt As String In mItems"$)
+	AddCode(CV, $"classList.put(mt, mt)"$)
+	AddCode(CV, "Next")
+	AddCode(CV, "End Sub")
+	AddNewLine(CV)
+	AddComment(CV, "add a class on condition")
+	AddCode(CV, $"public Sub AddClassOnCondition(varClass As String, varCondition As Boolean, varShouldBe As boolean)"$)
+	AddCode(CV, $"If BANano.IsUndefined(varCondition) Or BANano.IsNull(varCondition) Then Return"$)
+	AddCode(CV, $"if varShouldBe <> varCondition Then Return"$)
 	AddCode(CV, $"If BANano.IsUndefined(varClass) Or BANano.IsNull(varClass) Then Return"$)
 	AddCode(CV, $"If BANano.IsNumber(varClass) Then varClass = BANanoShared.CStr(varClass)"$)
 	AddCode(CV, $"varClass = varClass.trim"$)

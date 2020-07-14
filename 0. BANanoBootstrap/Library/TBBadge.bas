@@ -6,13 +6,12 @@ Version=7
 @EndOfDesignText@
 'Custom BANano View class
 
-#Event: click (event As BANanoEvent)
+#Event: click (event as BANanoEvent)
 
 #DesignerProperty: Key: Text, DisplayName: Text, FieldType: String, DefaultValue: , Description: Text on the element
 #DesignerProperty: Key: Classes, DisplayName: Classes, FieldType: String, DefaultValue: , Description: Classes added to the HTML tag.
 #DesignerProperty: Key: Style, DisplayName: Style, FieldType: String, DefaultValue: , Description: Styles added to the HTML tag. Must be a json String.
 #DesignerProperty: Key: Attributes, DisplayName: Attributes, FieldType: String, DefaultValue: , Description: Attributes added to the HTML tag. Must be a json String.
-
 #DesignerProperty: Key: MarginBottom, DisplayName: MarginBottom, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: MarginLeft, DisplayName: MarginLeft, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: MarginRight, DisplayName: MarginRight, FieldType: String, DefaultValue:  , Description: 
@@ -22,8 +21,8 @@ Version=7
 #DesignerProperty: Key: PaddingRight, DisplayName: PaddingRight, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: PaddingTop, DisplayName: PaddingTop, FieldType: String, DefaultValue:  , Description: 
 
-#DesignerProperty: Key: AlertDismissible, DisplayName: AlertDismissible, FieldType: Boolean, DefaultValue: False , Description: 
-#DesignerProperty: Key: AlertType, DisplayName: AlertType, FieldType: String, DefaultValue:  , Description: , List: alert-primary|alert-secondary|alert-success|alert-danger|alert-warning|alert-info|alert-light|alert-dark
+#DesignerProperty: Key: BadgePill, DisplayName: BadgePill, FieldType: Boolean, DefaultValue: False , Description: 
+#DesignerProperty: Key: BadgeType, DisplayName: BadgeType, FieldType: String, DefaultValue:  , Description: , List: badge-primary|badge-secondary|badge-success|badge-danger|badge-warning|badge-info|badge-light|badge-dark
 
 Sub Class_Globals
 Private BANano As BANano 'ignore
@@ -39,19 +38,18 @@ Private mText As String = ""
 Private classList As Map
 Private styleList As Map
 Private attributeList As Map
-Private mTagName As String = "div"
-Private mRole As String = "alert"
-Private mMarginBottom As String = ""
-Private mMarginLeft As String = ""
-Private mMarginRight As String = ""
-Private mMarginTop As String = ""
-Private mPaddingBottom As String = ""
-Private mPaddingLeft As String = ""
-Private mPaddingRight As String = ""
-Private mPaddingTop As String = ""
-Private mAlert As String = "alert"
-Private mAlertDismissible As Boolean = False
-Private mAlertType As String = ""
+Private mTagName As String = "span"
+Private mMarginBottom As String
+Private mMarginLeft As String
+Private mMarginRight As String
+Private mMarginTop As String
+Private mPaddingBottom As String
+Private mPaddingLeft As String
+Private mPaddingRight As String
+Private mPaddingTop As String
+Private mBadge As String = "badge"
+Private mBadgePill As Boolean = False
+Private mBadgeType As String = ""
 End Sub
 
 'initialize the custom view
@@ -80,11 +78,10 @@ mPaddingBottom = Props.Get("PaddingBottom")
 mPaddingLeft = Props.Get("PaddingLeft")
 mPaddingRight = Props.Get("PaddingRight")
 mPaddingTop = Props.Get("PaddingTop")
-mAlertDismissible = Props.Get("AlertDismissible")
-mAlertType = Props.Get("AlertType")
+mBadgePill = Props.Get("BadgePill")
+mBadgeType = Props.Get("BadgeType")
 End If
 
-AddAttr("role", mRole)
 AddStyle("margin-bottom", mMarginBottom)
 AddStyle("margin-left", mMarginLeft)
 AddStyle("margin-right", mMarginRight)
@@ -93,9 +90,9 @@ AddStyle("padding-bottom", mPaddingBottom)
 AddStyle("padding-left", mPaddingLeft)
 AddStyle("padding-right", mPaddingRight)
 AddStyle("padding-top", mPaddingTop)
-AddClass(mAlert)
-AddClassOnCondition("alert-dismissible", mAlertDismissible, True)
-AddClass(mAlertType)
+AddClass(mBadge)
+AddClassOnCondition("badge-pill", mBadgePill, True)
+AddClass(mBadgeType)
 AddClass(mClasses)
 setAttributes(mAttributes)
 setStyles(mStyle)
@@ -355,22 +352,22 @@ public Sub getPaddingTop() As String
 Return mPaddingTop
 End Sub
 
-public Sub setAlertDismissible(varAlertDismissible As Boolean)
-AddClass(varAlertDismissible)
-mAlertDismissible = varAlertDismissible
+public Sub setBadgePill(varBadgePill As Boolean)
+AddClass(varBadgePill)
+mBadgePill = varBadgePill
 End Sub
 
-public Sub getAlertDismissible() As Boolean
-Return mAlertDismissible
+public Sub getBadgePill() As Boolean
+Return mBadgePill
 End Sub
 
-public Sub setAlertType(varAlertType As String)
-AddClass(varAlertType)
-mAlertType = varAlertType
+public Sub setBadgeType(varBadgeType As String)
+AddClass(varBadgeType)
+mBadgeType = varBadgeType
 End Sub
 
-public Sub getAlertType() As String
-Return mAlertType
+public Sub getBadgeType() As String
+Return mBadgeType
 End Sub
 
 

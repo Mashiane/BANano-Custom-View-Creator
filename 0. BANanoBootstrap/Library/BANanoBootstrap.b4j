@@ -74,9 +74,13 @@ Library2=jfx
 Library3=banano
 Module1=|absolute|C:\Users\anelembanga\Documents\MEGA\MyApps\b4j\Shared\BANanoShared
 Module2=TBAlert
+Module3=TBAnchor
+Module4=TBBadge
+Module5=TBButton
+Module6=TBDiv
 NumberOfFiles=34
 NumberOfLibraries=3
-NumberOfModules=2
+NumberOfModules=6
 Version=8.5
 @EndOfDesignText@
 #Region Project Attributes 

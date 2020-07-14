@@ -6,13 +6,12 @@ Version=7
 @EndOfDesignText@
 'Custom BANano View class
 
-#Event: click (event As BANanoEvent)
 
 #DesignerProperty: Key: Text, DisplayName: Text, FieldType: String, DefaultValue: , Description: Text on the element
 #DesignerProperty: Key: Classes, DisplayName: Classes, FieldType: String, DefaultValue: , Description: Classes added to the HTML tag.
 #DesignerProperty: Key: Style, DisplayName: Style, FieldType: String, DefaultValue: , Description: Styles added to the HTML tag. Must be a json String.
 #DesignerProperty: Key: Attributes, DisplayName: Attributes, FieldType: String, DefaultValue: , Description: Attributes added to the HTML tag. Must be a json String.
-
+#DesignerProperty: Key: Href, DisplayName: Href, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: MarginBottom, DisplayName: MarginBottom, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: MarginLeft, DisplayName: MarginLeft, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: MarginRight, DisplayName: MarginRight, FieldType: String, DefaultValue:  , Description: 
@@ -21,9 +20,9 @@ Version=7
 #DesignerProperty: Key: PaddingLeft, DisplayName: PaddingLeft, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: PaddingRight, DisplayName: PaddingRight, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: PaddingTop, DisplayName: PaddingTop, FieldType: String, DefaultValue:  , Description: 
-
-#DesignerProperty: Key: AlertDismissible, DisplayName: AlertDismissible, FieldType: Boolean, DefaultValue: False , Description: 
-#DesignerProperty: Key: AlertType, DisplayName: AlertType, FieldType: String, DefaultValue:  , Description: , List: alert-primary|alert-secondary|alert-success|alert-danger|alert-warning|alert-info|alert-light|alert-dark
+#DesignerProperty: Key: AlertLink, DisplayName: AlertLink, FieldType: Boolean, DefaultValue: False , Description: 
+#DesignerProperty: Key: Badge, DisplayName: Badge, FieldType: Boolean, DefaultValue: False , Description: 
+#DesignerProperty: Key: BadgeType, DisplayName: BadgeType, FieldType: String, DefaultValue:  , Description: , List: badge-primary|badge-secondary|badge-success|badge-danger|badge-warning|badge-info|badge-light|badge-dark|none
 
 Sub Class_Globals
 Private BANano As BANano 'ignore
@@ -39,8 +38,8 @@ Private mText As String = ""
 Private classList As Map
 Private styleList As Map
 Private attributeList As Map
-Private mTagName As String = "div"
-Private mRole As String = "alert"
+Private mTagName As String = "a"
+Private mHref As String = ""
 Private mMarginBottom As String = ""
 Private mMarginLeft As String = ""
 Private mMarginRight As String = ""
@@ -49,9 +48,9 @@ Private mPaddingBottom As String = ""
 Private mPaddingLeft As String = ""
 Private mPaddingRight As String = ""
 Private mPaddingTop As String = ""
-Private mAlert As String = "alert"
-Private mAlertDismissible As Boolean = False
-Private mAlertType As String = ""
+Private mAlertLink As Boolean = False
+Private mBadge As Boolean = False
+Private mBadgeType As String = ""
 End Sub
 
 'initialize the custom view
@@ -72,6 +71,7 @@ mClasses = Props.Get("Classes")
 mAttributes = Props.Get("Attributes")
 mStyle = Props.Get("Style")
 mText = Props.Get("Text")
+mHref = Props.Get("Href")
 mMarginBottom = Props.Get("MarginBottom")
 mMarginLeft = Props.Get("MarginLeft")
 mMarginRight = Props.Get("MarginRight")
@@ -80,11 +80,12 @@ mPaddingBottom = Props.Get("PaddingBottom")
 mPaddingLeft = Props.Get("PaddingLeft")
 mPaddingRight = Props.Get("PaddingRight")
 mPaddingTop = Props.Get("PaddingTop")
-mAlertDismissible = Props.Get("AlertDismissible")
-mAlertType = Props.Get("AlertType")
+mAlertLink = Props.Get("AlertLink")
+mBadge = Props.Get("Badge")
+mBadgeType = Props.Get("BadgeType")
 End If
 
-AddAttr("role", mRole)
+AddAttr("href", mHref)
 AddStyle("margin-bottom", mMarginBottom)
 AddStyle("margin-left", mMarginLeft)
 AddStyle("margin-right", mMarginRight)
@@ -93,9 +94,9 @@ AddStyle("padding-bottom", mPaddingBottom)
 AddStyle("padding-left", mPaddingLeft)
 AddStyle("padding-right", mPaddingRight)
 AddStyle("padding-top", mPaddingTop)
-AddClass(mAlert)
-AddClassOnCondition("alert-dismissible", mAlertDismissible, True)
-AddClass(mAlertType)
+AddClassOnCondition("alert-link", mAlertLink, True)
+AddClassOnCondition("badge", mBadge, True)
+AddClass(mBadgeType)
 AddClass(mClasses)
 setAttributes(mAttributes)
 setStyles(mStyle)
@@ -104,7 +105,6 @@ setStyles(mStyle)
 Dim strHTML As String = ToString
 mElement = mTarget.Append(strHTML).Get("#" & mName)
 'add events for the custom view, if any
-mElement.HandleEvents("click", mCallBack, mEventName & "_click")
 
 End Sub
 
@@ -283,6 +283,15 @@ public Sub getText() As String
 Return mText
 End Sub
 
+public Sub setHref(varHref As String)
+AddAttr("href", varHref)
+mHref = varHref
+End Sub
+
+public Sub getHref() As String
+Return mHref
+End Sub
+
 public Sub setMarginBottom(varMarginBottom As String)
 AddStyle("margin-bottom", varMarginBottom)
 mMarginBottom = varMarginBottom
@@ -355,22 +364,31 @@ public Sub getPaddingTop() As String
 Return mPaddingTop
 End Sub
 
-public Sub setAlertDismissible(varAlertDismissible As Boolean)
-AddClass(varAlertDismissible)
-mAlertDismissible = varAlertDismissible
+public Sub setAlertLink(varAlertLink As Boolean)
+AddClass(varAlertLink)
+mAlertLink = varAlertLink
 End Sub
 
-public Sub getAlertDismissible() As Boolean
-Return mAlertDismissible
+public Sub getAlertLink() As Boolean
+Return mAlertLink
 End Sub
 
-public Sub setAlertType(varAlertType As String)
-AddClass(varAlertType)
-mAlertType = varAlertType
+public Sub setBadge(varBadge As Boolean)
+AddClass(varBadge)
+mBadge = varBadge
 End Sub
 
-public Sub getAlertType() As String
-Return mAlertType
+public Sub getBadge() As Boolean
+Return mBadge
+End Sub
+
+public Sub setBadgeType(varBadgeType As String)
+AddClass(varBadgeType)
+mBadgeType = varBadgeType
+End Sub
+
+public Sub getBadgeType() As String
+Return mBadgeType
 End Sub
 
 

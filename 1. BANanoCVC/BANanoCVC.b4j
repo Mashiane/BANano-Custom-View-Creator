@@ -26,8 +26,8 @@ Library2=jfx
 Library3=banano
 Library4=bananovuetifycore
 Library5=bananovuetifyconnect
-Library6=bananophp
-Library7=bananovuetifyprism
+Library6=bananovuetifyprism
+Library7=bananophplib
 Module1=clsBuilder
 Module2=pgComponent
 Module3=pgComponents
@@ -193,6 +193,7 @@ Sub BANano_Ready
 	rsClasses.SchemaAddField("classonsub", "TEXT")
 	rsClasses.SchemaAddField("classoninit", "TEXT")
 	rsClasses.SchemaAddField("classdesigner", "TEXT")
+	rsClasses.SchemaAddField("classaddoncondition", "TEXT")
 	'generate & run command to create the table
 	rsClasses.SchemaCreateTable
 	rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
@@ -212,7 +213,10 @@ Sub BANano_Ready
 	rsEvents.SchemaCreateTable
 	rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)
 	rsEvents.FromJSON
-
+	' we will create the parent folder for all custom views
+	Dim php As BANanoPHP
+	php.Initialize
+	BANano.CallInlinePHPWait(php.DIRECTORY_MAKE, php.BuildDirectoryMake("./customviews"))
 	'*** END: CREATE TABLES
 	pgIndex.Init
 End Sub

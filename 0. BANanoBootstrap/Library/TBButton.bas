@@ -21,9 +21,14 @@ Version=7
 #DesignerProperty: Key: PaddingLeft, DisplayName: PaddingLeft, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: PaddingRight, DisplayName: PaddingRight, FieldType: String, DefaultValue:  , Description: 
 #DesignerProperty: Key: PaddingTop, DisplayName: PaddingTop, FieldType: String, DefaultValue:  , Description: 
+#DesignerProperty: Key: Active, DisplayName: Active, FieldType: Boolean, DefaultValue: False , Description: 
 
-#DesignerProperty: Key: AlertDismissible, DisplayName: AlertDismissible, FieldType: Boolean, DefaultValue: False , Description: 
-#DesignerProperty: Key: AlertType, DisplayName: AlertType, FieldType: String, DefaultValue:  , Description: , List: alert-primary|alert-secondary|alert-success|alert-danger|alert-warning|alert-info|alert-light|alert-dark
+#DesignerProperty: Key: BtnBlock, DisplayName: BtnBlock, FieldType: Boolean, DefaultValue: False , Description: 
+#DesignerProperty: Key: BtnLink, DisplayName: BtnLink, FieldType: Boolean, DefaultValue: False , Description: 
+#DesignerProperty: Key: Disabled, DisplayName: Disabled, FieldType: Boolean, DefaultValue: False , Description: 
+#DesignerProperty: Key: ForeColor, DisplayName: ForeColor, FieldType: String, DefaultValue:  , Description: , List: btn-primary|btn-secondary|btn-success|btn-danger|btn-warning|btn-info|btn-light|btn-dark|none
+#DesignerProperty: Key: Outline, DisplayName: Outline, FieldType: String, DefaultValue:  , Description: , List: btn-outline-primary|btn-outline-secondary|btn-outline-success|btn-outline-danger|btn-outline-warning|btn-outline-info|btn-outline-light|btn-outline-dark|none
+#DesignerProperty: Key: Size, DisplayName: Size, FieldType: String, DefaultValue:  , Description: , List: btn-small|btn-lg|normal
 
 Sub Class_Globals
 Private BANano As BANano 'ignore
@@ -39,8 +44,8 @@ Private mText As String = ""
 Private classList As Map
 Private styleList As Map
 Private attributeList As Map
-Private mTagName As String = "div"
-Private mRole As String = "alert"
+Private mTagName As String = "button"
+Private mType As String = "button"
 Private mMarginBottom As String = ""
 Private mMarginLeft As String = ""
 Private mMarginRight As String = ""
@@ -49,9 +54,14 @@ Private mPaddingBottom As String = ""
 Private mPaddingLeft As String = ""
 Private mPaddingRight As String = ""
 Private mPaddingTop As String = ""
-Private mAlert As String = "alert"
-Private mAlertDismissible As Boolean = False
-Private mAlertType As String = ""
+Private mActive As Boolean = False
+Private mBtn As String = "btn"
+Private mBtnBlock As Boolean = False
+Private mBtnLink As Boolean = False
+Private mDisabled As Boolean = False
+Private mForeColor As String = ""
+Private mOutline As String = ""
+Private mSize As String = ""
 End Sub
 
 'initialize the custom view
@@ -80,11 +90,16 @@ mPaddingBottom = Props.Get("PaddingBottom")
 mPaddingLeft = Props.Get("PaddingLeft")
 mPaddingRight = Props.Get("PaddingRight")
 mPaddingTop = Props.Get("PaddingTop")
-mAlertDismissible = Props.Get("AlertDismissible")
-mAlertType = Props.Get("AlertType")
+mActive = Props.Get("Active")
+mBtnBlock = Props.Get("BtnBlock")
+mBtnLink = Props.Get("BtnLink")
+mDisabled = Props.Get("Disabled")
+mForeColor = Props.Get("ForeColor")
+mOutline = Props.Get("Outline")
+mSize = Props.Get("Size")
 End If
 
-AddAttr("role", mRole)
+AddAttr("type", mType)
 AddStyle("margin-bottom", mMarginBottom)
 AddStyle("margin-left", mMarginLeft)
 AddStyle("margin-right", mMarginRight)
@@ -93,9 +108,14 @@ AddStyle("padding-bottom", mPaddingBottom)
 AddStyle("padding-left", mPaddingLeft)
 AddStyle("padding-right", mPaddingRight)
 AddStyle("padding-top", mPaddingTop)
-AddClass(mAlert)
-AddClassOnCondition("alert-dismissible", mAlertDismissible, True)
-AddClass(mAlertType)
+AddClassOnCondition("active", mActive, True)
+AddClass(mBtn)
+AddClassOnCondition("btn-block", mBtnBlock, True)
+AddClassOnCondition("btn-link", mBtnLink, True)
+AddClassOnCondition("disabled", mDisabled, True)
+AddClass(mForeColor)
+AddClass(mOutline)
+AddClass(mSize)
 AddClass(mClasses)
 setAttributes(mAttributes)
 setStyles(mStyle)
@@ -355,22 +375,67 @@ public Sub getPaddingTop() As String
 Return mPaddingTop
 End Sub
 
-public Sub setAlertDismissible(varAlertDismissible As Boolean)
-AddClass(varAlertDismissible)
-mAlertDismissible = varAlertDismissible
+public Sub setActive(varActive As Boolean)
+AddClass(varActive)
+mActive = varActive
 End Sub
 
-public Sub getAlertDismissible() As Boolean
-Return mAlertDismissible
+public Sub getActive() As Boolean
+Return mActive
 End Sub
 
-public Sub setAlertType(varAlertType As String)
-AddClass(varAlertType)
-mAlertType = varAlertType
+public Sub setBtnBlock(varBtnBlock As Boolean)
+AddClass(varBtnBlock)
+mBtnBlock = varBtnBlock
 End Sub
 
-public Sub getAlertType() As String
-Return mAlertType
+public Sub getBtnBlock() As Boolean
+Return mBtnBlock
+End Sub
+
+public Sub setBtnLink(varBtnLink As Boolean)
+AddClass(varBtnLink)
+mBtnLink = varBtnLink
+End Sub
+
+public Sub getBtnLink() As Boolean
+Return mBtnLink
+End Sub
+
+public Sub setDisabled(varDisabled As Boolean)
+AddClass(varDisabled)
+mDisabled = varDisabled
+End Sub
+
+public Sub getDisabled() As Boolean
+Return mDisabled
+End Sub
+
+public Sub setForeColor(varForeColor As String)
+AddClass(varForeColor)
+mForeColor = varForeColor
+End Sub
+
+public Sub getForeColor() As String
+Return mForeColor
+End Sub
+
+public Sub setOutline(varOutline As String)
+AddClass(varOutline)
+mOutline = varOutline
+End Sub
+
+public Sub getOutline() As String
+Return mOutline
+End Sub
+
+public Sub setSize(varSize As String)
+AddClass(varSize)
+mSize = varSize
+End Sub
+
+public Sub getSize() As String
+Return mSize
 End Sub
 
 
