@@ -22,6 +22,10 @@ To demonstrate this, we have gone to the basics, we will take a basic anchor tag
 
 [BANano Custom View Creator on YouTube - Part 2 (Styles)](https://youtu.be/WDfGkes5RAc)
 
+[BANano Custom View Creator on YouTube - Part 3 (Classes)](https://youtu.be/7oBbsAOi2hc)
+
+[BANano Custom View Creator on YouTube - Part 4 (Events)](https://youtu.be/zCpLPw2sAPs)
+
 **Running the WebApp Locally**
 
 1. In the 0. MySQL Backend folder, you will find a SQL file. Import this to your webserver with phpMyAdmin.
