@@ -186,6 +186,7 @@ Sub UploadBVAttributes(fc As String)
 		For Each attrm As Map In attributesL
 			Dim sdefault As String = attrm.get("default")
 			Dim sdescription As String = attrm.Get("description")
+			sdescription = CleanDescription(sdescription)
 			Dim stag As String = attrm.get("tag")
 			Dim stype As String = attrm.get("type")
 			stype = BANanoShared.BeautifyName(stype)
@@ -379,6 +380,7 @@ Sub UploadWebTypes(fc As String)
 		Dim colname As String = coltags.GetDefault("name", "")
 		Dim coldescription As String = coltags.GetDefault("description","")
 		'
+		colname = CleanDescription(colname)
 		If colname = "" Then Continue
 		
 		'exclude icons
@@ -400,6 +402,7 @@ Sub UploadWebTypes(fc As String)
 				Dim aname As String = colattributes.GetDefault("name","")
 				Dim adescription As String = colattributes.GetDefault("description","")
 				Dim atype As String = colattributes.GetDefault("type","")
+				adescription = CleanDescription(adescription)
 								'
 				adefault = adefault.replace(QUOTE,"")
 				adefault = adefault.replace("null", "")
@@ -426,6 +429,9 @@ Sub UploadWebTypes(fc As String)
 				End If
 				'
 				If aname <> "" Then
+					'
+					If aname.EqualsIgnoreCase("id") Then Continue
+					'
 					Dim mattr As Map = CreateMap()
 					mattr.put("default", adefault)
 					mattr.Put("name", aname)
@@ -484,6 +490,7 @@ Sub UploadWebTypes(fc As String)
 				Dim ename As String = colevents.GetDefault("name","")
 				Dim edescription As String = colevents.GetDefault("description","")
 				'
+				ename = CleanDescription(ename)
 				If ename = "" Then Continue
 				'
 				Dim event As Map = CreateMap()
@@ -499,6 +506,7 @@ Sub UploadWebTypes(fc As String)
 						Dim colargumentsname As String = colarguments.GetDefault("name","")
 						Dim colargumentsdescription As String = colevents.GetDefault("description","")
 						'
+						colargumentsname = CleanDescription(colargumentsname)
 						If colargumentsname = "" Then Continue
 						'
 						'save the event
@@ -540,6 +548,7 @@ Sub UploadWebTypes(fc As String)
 			mstyle.put("styledesigner", "Yes")
 			mstyle.put("defaultvalue", "")
 			mstyle.put("styleoptions", "")
+			mstyle.Put("styledescription","")
 			
 			Select Case mse
 			Case "border-style"
@@ -558,11 +567,7 @@ Sub UploadWebTypes(fc As String)
 	'save the components
 	vm.SetData("components", components)
 	vm.ShowSnackBarSuccess($"${components.size} components processed!"$)
-	'
-	Log(components)
-	
 End Sub
-
 
 
 'show the page
@@ -926,4 +931,18 @@ Sub CleanArgument(etype As String) As String
 	If etype.startswith("void") Then etype = "Object"
 	If etype.startswith("{") Then etype = "Object"
 	Return etype
+End Sub
+
+Sub CleanDescription(sdesc As String) As String
+	sdesc = sdesc.replace(QUOTE,"")
+	sdesc = sdesc.replace("null", "")
+	sdesc = sdesc.replace("undefined", "")
+	sdesc = sdesc.replace("'","")
+	sdesc = sdesc.replace("[","")
+	sdesc = sdesc.replace("]","")
+	sdesc = sdesc.replace("{","")
+	sdesc = sdesc.replace("}","")
+	sdesc = sdesc.replace(")","")
+	sdesc = sdesc.replace("(","")
+	Return sdesc
 End Sub
