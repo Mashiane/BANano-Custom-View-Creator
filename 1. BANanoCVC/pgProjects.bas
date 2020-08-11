@@ -108,6 +108,14 @@ Sub DeleteRecord_Projects(RecordID As String)
 	rsClasses.Delete(RecordID)
 	rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
 	rsClasses.FromJSON
+	'delete events
+	Dim rsEvents As BANanoMySQLE
+	rsEvents.Initialize("bananocvc", "events", "projectid", "projectid")
+	rsEvents.SchemaAddInt(Array("projectid"))
+	rsEvents.Delete(RecordID)
+	rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)
+	rsEvents.FromJSON
+	
 	'execute code to refresh listing for Projects
 	vm.CallMethod("SelectAll_Projects")
 End Sub
@@ -248,7 +256,13 @@ Sub CreateDialog_Projects
 	txtprojectprefix.SetHideDetails(True)
 	txtprojectprefix.SetVisible(True)
 	dlgProjects.Container.AddControl(txtprojectprefix.textfield, txtprojectprefix.tostring, 3, 2, 0, 0, 0, 0, 12, 6, 6, 6)
-
+	'
+	
+	Dim swtprojectvue As VMCheckBox = vm.NewSwitch(Me, False, "swtprojectvue", "projectvue", "Is Vue", "Yes", "No", False, 0)
+	swtprojectvue.SetFieldType("string")
+	swtprojectvue.SetVisible(True)
+	swtprojectvue.SetHideDetails(True)
+	dlgProjects.Container.AddControl(swtprojectvue.CheckBox, swtprojectvue.tostring, 4, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 	vm.AddDialog(dlgProjects)
 End Sub
@@ -315,6 +329,7 @@ Sub CreateDataTable_projects
 	dtprojects = vm.CreateDataTable("dtprojects", "projectid", Me)
 	dtprojects.SetTitle("Projects")
 	dtprojects.SetSearchbox(True)
+	dtprojects.AddDivider
 	dtprojects.SetAddNew("btnNewProject", "mdi-plus", "Add a new project")
 	dtprojects.SetItemsperpage("10")
 	dtprojects.SetMobilebreakpoint("600")
@@ -327,11 +342,103 @@ Sub CreateDataTable_projects
 	dtprojects.AddColumn1("projectauthor", "Project Author", "text",0,False,"start")
 	dtprojects.AddColumn1("projectversion", "Project Version", "text",0,False,"start")
 	dtprojects.AddColumn1("projectprefix", "Project Prefix", "text",0,False,"start")
+	dtprojects.AddColumn1("projectvue", "VueJS","text",0,False,"start")
 	dtprojects.SetEdit(True)
 	dtprojects.SetDelete(True)
 	dtprojects.SetMenu(True)
+	dtprojects.AddAction("compile", "Compile", "mdi-cog")
 	dtprojects.SetIconDimensions1("edit", "24px", "success","80")
 	dtprojects.SetIconDimensions1("delete", "24px", "error","80")
 	dtprojects.SetIconDimensions1("menu", "24px", "orange","80")
+	dtprojects.SetIconDimensions1("compile", "24px", "blue","80")
 	cont.AddControl(dtprojects.DataTable, dtprojects.tostring, 1, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+End Sub
+
+Sub dtprojects_compile(item As Map)
+	'save the project details
+	vm.SetData("project", item)
+	Dim cprojectid As String = item.getdefault("projectid","")
+	Dim cprojectname As String = item.getdefault("projectname","")
+	Dim cprojectprefix As String = item.getdefault("projectprefix", "")
+	Dim cprojectversion As String = item.getdefault("projectversion", "")
+	Dim cprojectvue As String = item.getdefault("projectvue", "")
+	'
+	php.Initialize
+	BANano.CallInlinePHPWait(php.DIRECTORY_MAKE, php.BuildDirectoryMake($"./customviews/${cprojectname}"$))
+			
+	'compile custom view components
+	vm.SHowloading
+	
+	'select all components
+	Dim rsComponents As BANanoMySQLE
+	rsComponents.Initialize("bananocvc", "components", "projectid", "projectid")
+	rsComponents.SchemaAddInt(Array("projectid"))
+	rsComponents.SelectWhere("components", Array("*"), CreateMap("projectid": cprojectid), Array("="), Array("componenttag"))
+	rsComponents.JSON = BANano.CallInlinePHPWait(rsComponents.MethodName, rsComponents.Build)
+	rsComponents.FromJSON
+	Dim Result As List = rsComponents.result
+	'process each component
+	For Each mcomponent As Map In Result
+		Dim ccomponentdescription As String = mcomponent.getdefault("componentdescription","")
+		Dim scomponentid As String = mcomponent.GetDefault("componentid", "")
+		Dim ccomponenttag As String = mcomponent.getdefault("componenttag", "")
+		'
+		vm.setdata("componentdescription", ccomponentdescription)
+		'get all attributes for component
+		Dim rsAttributes As BANanoMySQLE
+		rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+		'generate & run command to select all records
+		rsAttributes.SchemaAddInt(Array("componentid"))
+		Dim aw As Map = CreateMap()
+		aw.put("componentid", scomponentid)
+		rsAttributes.SelectWhere("attributes", Array("*"), aw, Array("="), Array("attrname"))
+		rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+		rsAttributes.FromJSON
+		'get all styles for component
+		Dim rsStyles As BANanoMySQLE
+		rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
+		rsStyles.SchemaAddInt(Array("componentid"))
+		Dim aw As Map = CreateMap()
+		aw.put("componentid", scomponentid)
+		rsStyles.SelectWhere("styles", Array("*"), aw, Array("="), Array("stylename"))
+		rsStyles.JSON = BANano.CallInlinePHPWait(rsStyles.MethodName, rsStyles.Build)
+		rsStyles.FromJSON
+		'get all classes for component
+		Dim rsClasses As BANanoMySQLE
+		rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
+		rsClasses.SchemaAddInt(Array("componentid"))
+		Dim aw As Map = CreateMap()
+		aw.put("componentid", scomponentid)
+		rsClasses.SelectWhere("classes", Array("*"), aw, Array("="), Array("classname"))
+		rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
+		rsClasses.FromJSON
+		'get all events for component
+		Dim rsEvents As BANanoMySQLE
+		rsEvents.Initialize("bananocvc", "events", "eventid", "eventid")
+		rsEvents.SchemaAddInt(Array("componentid"))
+		Dim aw As Map = CreateMap()
+		aw.put("componentid", scomponentid)
+		rsEvents.SelectWhere("events", Array("*"), aw, Array("="), Array("eventname"))
+		rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)
+		rsEvents.FromJSON
+	
+		'define file name
+		Dim sCompName As String = $"${cprojectprefix}${ccomponentdescription}"$
+		'
+		Dim builder As clsBuilder
+		builder.Initialize(vm, ccomponenttag, sCompName, rsAttributes.Result, rsStyles.Result, rsClasses.Result, rsEvents.Result)
+		builder.projectvue = cprojectvue
+		'
+		Dim sb4xcode As String = builder.CreateCustomView
+		'
+		vue.Setdata("b4xCode", sb4xcode)
+		vue.Setdata("filename", sCompName)
+		'
+		If sCompName <> "" And sb4xcode <> "" Then
+			'save the component To File
+			Dim fileName As String = $"./customviews/${cprojectname}/${sCompName}.bas"$
+			BANano.CallInlinePHPWait(php.FILE_WRITE, php.BuildWriteFile(fileName, sb4xcode))
+		End If
+	Next
+	vm.HideLoading
 End Sub

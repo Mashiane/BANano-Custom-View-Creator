@@ -72,6 +72,7 @@ Sub BuildNavBar
 	vm.NavBar.SetFixed(True)
 	vm.NavBar.SetVisible(True)
 	vm.NavBar.SetColor("indigo")
+	vm.navbar.Progress.SetColor(vm.COLOR_ORANGE)
 	'
 	Dim lblBy As VMLabel
 	lblBy.Initialize(vue, "doneby").SetText("Created by TheMash").AddClass("mx-2 white--text")

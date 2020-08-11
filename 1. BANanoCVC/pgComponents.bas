@@ -41,7 +41,529 @@ Sub Code
 	vm.AddContainer(cont)
 	'add method to get all records
 	vm.SetMethod(Me, "SelectAll_Components")
+	'import bootstrap vue web types
+	vm.AddFileSelect(Me, "bvwebtypes")
+	vm.AddFileSelect(Me, "bvtags")
+	vm.AddFileSelect(Me, "bvattributes")
+	
 End Sub
+
+'bootstrap vue attributes
+Sub bvattributes_change(e As BANanoEvent)
+	'get the file contents
+	Dim res As Map
+	Dim err As Map
+	Dim readPromise As BANanoPromise = BANanoShared.GetFileAsText(e)
+	readPromise.Then(res)
+	Dim fc As String = res.get("result")
+	UploadBVAttributes(fc)
+	readPromise.Else(err)
+	readPromise.end
+	vm.NullifyFileSelect("bvattributes")
+End Sub
+
+'upload bv attributes
+Sub UploadBVAttributes(fc As String)
+	Dim components As Map = vm.GetData("components")
+	
+	If BANano.IsNull(components) Or BANano.IsUndefined(components) Then
+		vm.ShowSnackBarError("The components have not been imported yet!")
+		Return
+	End If
+	'
+	Dim wbm As Map = BANano.fromjson(fc)
+	For Each k As String In wbm.Keys
+		Dim attrm As Map = wbm.Get(k)
+		Dim stype As String = attrm.get("type")
+		'
+		Dim compName As String = vm.MvField(k,1,"/")
+		Dim attrName As String = vm.mvfield(k,2,"/")
+		'
+		Dim bComp As String = vm.beautifyname(compName)
+		Dim aComp As String = vm.BeautifyRest(attrName)
+		
+		'does the component exist		
+		If components.ContainsKey(bComp) Then
+			'get the component
+			Dim oldcomp As Map = components.get(bComp)
+			'update the tab
+			oldcomp.put("tag", compName)
+			'get the attributes
+			Dim oldattributes As List = oldcomp.get("attributes")
+			For Each oldattr As Map In oldattributes
+				Dim sname As String = oldattr.get("name")
+				If sname = aComp Then 
+					oldattr.put("tag", attrName)
+					stype = CleanType(stype)
+					oldattr.put("type", stype)
+				End If
+			Next
+			oldcomp.Put("attributes", oldattributes)
+			components.put(bComp, oldcomp)
+		Else
+			Log($"${compName} NOT FOUND!"$)
+		End If
+	Next
+	vm.setdata("components", components)	
+	vm.ShowSnackBarSuccess($"${components.size} components processed!"$)
+	'upload to system
+	vm.Showloading
+	'read the project details
+	Dim mproject As Map = vm.GetData("project")
+	'
+	Dim cprojectid As String = mproject.getdefault("projectid","")
+	'delete everything for project
+	Dim rsComponents As BANanoMySQLE
+	rsComponents.Initialize("bananocvc", "components", "projectid", "projectid")
+	rsComponents.SchemaAddInt(Array("projectid"))
+	rsComponents.Delete(cprojectid)
+	rsComponents.JSON = BANano.CallInlinePHPWait(rsComponents.MethodName, rsComponents.Build)
+	rsComponents.FromJSON
+	'delete attributes
+	Dim rsAttributes As BANanoMySQLE
+	rsAttributes.Initialize("bananocvc", "attributes", "projectid", "projectid")
+	rsAttributes.SchemaAddInt(Array("projectid"))
+	rsAttributes.Delete(cprojectid)
+	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+	rsAttributes.FromJSON
+	'delete styles
+	Dim rsStyles As BANanoMySQLE
+	rsStyles.Initialize("bananocvc", "styles", "projectid", "projectid")
+	rsStyles.SchemaAddInt(Array("projectid"))
+	rsStyles.Delete(cprojectid)
+	rsStyles.JSON = BANano.CallInlinePHPWait(rsStyles.MethodName, rsStyles.Build)
+	rsStyles.FromJSON
+	'delete classes
+	Dim rsClasses As BANanoMySQLE
+	rsClasses.Initialize("bananocvc", "classes", "projectid", "projectid")
+	rsClasses.SchemaAddInt(Array("projectid"))
+	rsClasses.Delete(cprojectid)
+	rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
+	rsClasses.FromJSON
+	'delete events
+	Dim rsEvents As BANanoMySQLE
+	rsEvents.Initialize("bananocvc", "events", "projectid", "projectid")
+	rsEvents.SchemaAddInt(Array("projectid"))
+	rsEvents.Delete(cprojectid)
+	rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)
+	rsEvents.FromJSON
+	'
+	'add the components
+	For Each k As String In components.keys
+		Dim comp As Map = components.get(k)
+		Dim sname As String = comp.get("name")
+		Dim stag As String = comp.get("tag")
+		'
+		Dim rsComponent As BANanoMySQLE
+		rsComponent.Initialize("bananocvc", "components", "componentid", "componentid")
+		rsComponent.SchemaAddInt(Array("projectid"))
+		Dim record As Map = CreateMap()
+		record.put("projectid", cprojectid)
+		record.put("componenttag",stag)
+		record.put("componentdescription", sname)
+		rsComponent.Insert1(record)
+		rsComponent.JSON = BANano.CallInlinePHPWait(rsComponent.MethodName, rsComponent.Build)
+		rsComponent.FromJSON
+	Next
+	'select all components for project
+	Dim rsComponentsU As BANanoMySQLE
+	rsComponentsU.Initialize("bananocvc", "components", "componentid", "componentid")
+	rsComponentsU.SchemaAddInt(Array("componentid","projectid"))
+	Dim cw As Map = CreateMap()
+	cw.put("projectid", cprojectid)
+	rsComponentsU.SelectWhere("components", Array("*"), cw, Array("="), Array("componentdescription"))
+	rsComponentsU.JSON = BANano.CallInlinePHPWait(rsComponentsU.MethodName, rsComponentsU.Build)
+	rsComponentsU.FromJSON
+	Dim Result As List = rsComponentsU.Result
+	For Each compU As Map In Result
+		Dim sname As String = compU.Get("componentdescription")
+		Dim stag As String = compU.Get("componenttag")
+		Dim scomponentid  As String = compU.get("componentid")
+		
+		'get the component from the previouslt saved list
+		Dim xcomponent As Map = components.get(sname)
+		Dim attributesL As List = xcomponent.get("attributes")
+		For Each attrm As Map In attributesL
+			Dim sdefault As String = attrm.get("default")
+			Dim sdescription As String = attrm.Get("description")
+			Dim stag As String = attrm.get("tag")
+			Dim stype As String = attrm.get("type")
+			stype = BANanoShared.BeautifyName(stype)
+			'
+			Dim na As Map = CreateMap()
+			na.put("attrname", stag)
+			na.Put("projectid", cprojectid)
+			na.put("componentid", scomponentid)
+			na.put("defaultvalue", sdefault)
+			na.put("attrtype", stype)
+			na.put("attrdescription", sdescription)
+			na.put("attrhasset", "Yes")
+			na.put("attrhasget", "Yes")
+			na.put("attroptions", "")
+			na.put("attrmin", "")
+			na.put("attrmax","")
+			na.put("attronsub", "No")
+			na.put("attroninit", "No")
+			na.put("attrdesigner", "No")
+			na.put("attrexplode", "No")
+			Select Case stype
+			Case "Boolean", "String", "boolean", "string"
+				na.put("attrdesigner", "Yes")
+			End Select
+			'add to database
+			Dim rsA As BANanoMySQLE
+			rsA.Initialize("bananocvc", "attributes", "attrid", "attrid")
+			rsA.SchemaAddInt(Array("attrid","projectid","componentid"))
+			rsA.Insert1(na)
+			rsA.JSON = BANano.CallInlinePHPWait(rsA.MethodName, rsA.Build)
+			rsA.FromJSON
+		Next
+		'process events
+		Dim eventsL As List = xcomponent.get("events")
+		For Each eventM As Map In eventsL
+			Dim ename As String = eventM.get("name")
+			Dim em As Map = CreateMap()
+			em.put("eventname", ename)
+			em.put("eventarguments", "")
+			em.put("eventactive", "Yes")
+			em.put("projectid", cprojectid)
+			em.put("componentid", scomponentid)
+			'
+			Dim sbxE As StringBuilder
+			sbxE.Initialize
+			'
+			If eventM.containskey("arguments") Then
+				Dim eventsL As List = eventM.get("arguments")
+				For Each emm As Map In eventsL
+					Dim eargument As String = emm.get("argument")
+					Dim etype As String = emm.get("type")
+					etype = CleanArgument(etype)
+					'					
+					sbxE.append($"${eargument} As ${etype},"$)
+				Next
+			End If
+			Dim sbyE As String = sbxE.tostring
+			sbyE = vue.remdelim(sbyE, ",")
+			em.put("eventarguments", sbyE)
+			'
+			'add to database
+			Dim rsE As BANanoMySQLE
+			rsE.Initialize("bananocvc", "events", "eventid", "eventid")
+			rsE.SchemaAddInt(Array("eventid","projectid","componentid"))
+			rsE.Insert1(em)
+			rsE.JSON = BANano.CallInlinePHPWait(rsE.MethodName, rsE.Build)
+			rsE.FromJSON
+		Next
+		'process styles
+		Dim stylesL As List = xcomponent.get("styles")
+		For Each mstyle As Map In stylesL
+			mstyle.put("projectid", cprojectid)
+			mstyle.put("componentid", scomponentid)
+			'
+			'add to database
+			Dim rsS As BANanoMySQLE
+			rsS.Initialize("bananocvc", "styles", "styleid", "styleid")
+			rsS.SchemaAddInt(Array("styleid","projectid","componentid"))
+			rsS.Insert1(mstyle)
+			rsS.JSON = BANano.CallInlinePHPWait(rsS.MethodName, rsS.Build)
+			rsS.FromJSON
+		Next
+	Next
+	
+	vm.HideLoading
+	vm.CallMethod("SelectAll_Components")
+End Sub
+
+'bootstrap vue tags
+Sub bvtags_change(e As BANanoEvent)
+	'get the file contents
+	Dim res As Map
+	Dim err As Map
+	Dim readPromise As BANanoPromise = BANanoShared.GetFileAsText(e)
+	readPromise.Then(res)
+	Dim fc As String = res.get("result")
+	UploadTags(fc)
+	readPromise.Else(err)
+	readPromise.end
+	vm.NullifyFileSelect("bvtags")
+End Sub
+
+Sub UploadTags(fc As String)
+	'get the saved tags
+	Dim components As Map = vm.GetData("components")
+	
+	If BANano.IsNull(components) Or BANano.IsUndefined(components) Then
+		vm.ShowSnackBarError("The components have not been imported yet!")
+		Return 
+	End If
+	'
+	vm.showloading
+	
+	Dim wbm As Map = BANano.fromjson(fc)
+	For Each k As String In wbm.keys
+		'brautify the name
+		Dim cName As String = vm.BeautifyName(k)
+		'only process those that are not icons
+		If k.startswith("b-icon-") = False Then
+			'get the component from the list
+			If components.ContainsKey(cName) Then
+				'get the component
+				Dim oldcomp As Map = components.get(cName)
+				'update the tab
+				oldcomp.put("tag", k)
+				'get the attributes
+				Dim oldattributes As List = oldcomp.get("attributes")
+				Dim oldattributesk As Map = CreateMap()
+				For Each oldattr As Map In oldattributes
+					Dim sname As String = oldattr.get("name")
+					oldattributesk.put(sname, sname)
+				Next
+				'
+				Dim comp As Map = wbm.Get(k)
+				Dim attributes As List = comp.Get("attributes")
+				For Each colattributes As String In attributes
+					Dim beaAttr As String = vm.BeautifyRest(colattributes)
+					'check if attributes match
+					If oldattributesk.containskey(beaAttr) = False Then
+						Log($"Missing attribute: ${cName}.${colattributes}"$)
+					End If
+				Next
+			End If
+		End If
+	Next
+	'save the components
+	vm.HideLoading
+	vm.SetData("components", components)
+	vm.ShowSnackBarSuccess($"${components.size} components processed!"$)
+	Log(components)
+End Sub
+
+'bootstrap vue web types
+Sub bvwebtypes_change(e As BANanoEvent)
+	'get the file contents
+	Dim res As Map
+	Dim err As Map
+	Dim readPromise As BANanoPromise = BANanoShared.GetFileAsText(e)
+	readPromise.Then(res)
+		Dim fc As String = res.get("result")
+		UploadWebTypes(fc)
+	readPromise.Else(err)
+	readPromise.end
+	'upload the file to the server
+	
+	'get the file name
+	'Dim sFileName As String = BANanoShared.GetUploadFileName(e)
+	'start the import
+	'Dim Rslt As Map
+	'Dim uploadPromise As BANanoPromise = BANanoShared.UploadFile(e)
+	'uploadPromise.Then(Rslt)
+	'	'get the result of the upload
+	'	Dim filePath As String = BANanoShared.GetUploadResult(sFileName, Rslt)
+	'	Log(filePath)
+	'uploadPromise.End
+	vm.NullifyFileSelect("bvwebtypes")
+End Sub
+
+'upload the web types file
+Sub UploadWebTypes(fc As String)
+	Dim components As Map = CreateMap()
+	vm.ShowLoading
+	'
+	Dim wbm As Map = BANano.fromjson(fc)
+		
+	Dim contributions As Map = wbm.get("contributions")
+	Dim html As Map = contributions.get("html")
+	Dim tags As List = html.Get("tags")
+	'
+	For Each coltags As Map In tags
+		Dim colname As String = coltags.GetDefault("name", "")
+		Dim coldescription As String = coltags.GetDefault("description","")
+		'
+		If colname = "" Then Continue
+		
+		'exclude icons
+		If colname.startswith("BIcon") Then Continue
+			
+		'component
+		Dim comp As Map = CreateMap()
+		comp.put("name", colname)
+		comp.put("description", coldescription)
+		'
+		Dim compattrs As List = vm.newlist
+		'		
+		If coltags.ContainsKey("attributes") Then
+			'process attributes
+			Dim cattributes As List = coltags.Get("attributes")
+			'
+			For Each colattributes As Map In cattributes
+				Dim adefault As String = colattributes.GetDefault("default","")
+				Dim aname As String = colattributes.GetDefault("name","")
+				Dim adescription As String = colattributes.GetDefault("description","")
+				Dim atype As String = colattributes.GetDefault("type","")
+								'
+				adefault = adefault.replace(QUOTE,"")
+				adefault = adefault.replace("null", "")
+				adefault = adefault.replace("undefined", "")
+				adefault = adefault.replace("'","")
+				If adefault.startswith("[") Then adefault = ""
+				If adefault.startswith("{") Then adefault = ""
+				If adefault.startswith("(") Then adefault = ""
+				'
+				If atype = "" Then
+					If colattributes.ContainsKey("value") Then
+						Dim avalue As Map = colattributes.Get("value")
+						If avalue.containskey("type") Then 
+							Dim otype As Object = avalue.get("type")
+							Dim stype As String = GetType(otype)
+							Select Case stype
+							Case "string"	
+								atype = avalue.GetDefault("type","")
+							Case Else
+								atype = vue.join("|", otype)
+							End Select
+						End If
+					End If
+				End If
+				'
+				If aname <> "" Then
+					Dim mattr As Map = CreateMap()
+					mattr.put("default", adefault)
+					mattr.Put("name", aname)
+					mattr.put("description", adescription)
+					atype = CleanType(atype)
+					mattr.put("type", atype)
+					'
+					Select Case aname
+					Case "color", "text-color","background-color"
+						mattr.Put("attroptions","amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
+					Case "transition"
+						mattr.put("attroptions", "slide-x-transition|slide-x-reverse-transition|slide-y-transition|slide-y-reverse-transition|scroll-x-transition|scroll-x-reverse-transition|scroll-y-transition|scroll-y-reverse-transition|scale-transition|fade-transition|fab-transition|none")
+					Case "target"
+						mattr.put("attroptions", "_blank|_self|_parent|_top|none")
+					Case "type"
+						If colname.EqualsIgnoreCase("v-alert") Or colname.EqualsIgnoreCase("VAlert") Then
+							mattr.put("attroptions", "success|info|warning|error|none")
+						End If
+					Case "border"
+						If colname.EqualsIgnoreCase("v-alert") Or colname.EqualsIgnoreCase("VAlert") Then
+							mattr.put("attroptions", "top|right|bottom|left|none")
+						End If
+					End Select
+					'add attribute to list
+					compattrs.add(mattr)
+				End If
+			Next
+		End If
+		'
+		'add vue attributes
+		Dim vueattributes As List = vue.newlist
+		vueattributes.AddAll(Array("key", "v-html", "v-text", "v-model", "ref", "v-if", "v-else", "v-show", _
+		"v-for", "v-else-if", "v-bind:class","v-bind:style","parent-id","v-on"))
+		For Each attrx As String In vueattributes
+			'the key should be the component.attribute
+			Dim mattr As Map = CreateMap()
+			mattr.put("default", "")
+			mattr.Put("name", attrx)
+			mattr.put("description", attrx)
+			mattr.put("type", "string")
+			mattr.put("tag", attrx)
+			compattrs.add(mattr)
+		Next
+		
+		'component, add attributes
+		comp.put("attributes", compattrs)
+		'
+		Dim compEvents As List = vm.newlist
+		'process events
+		If coltags.ContainsKey("events") Then
+			'process events
+			Dim events As List = coltags.Get("events")
+			
+			For Each colevents As Map In events
+				'get the event
+				Dim ename As String = colevents.GetDefault("name","")
+				Dim edescription As String = colevents.GetDefault("description","")
+				'
+				If ename = "" Then Continue
+				'
+				Dim event As Map = CreateMap()
+				event.put("name", ename)
+				event.put("description", edescription)
+				'
+				Dim eventl As List = vm.newlist
+				'arguemets
+				If colevents.containskey("arguments") Then
+					Dim arguments As List = colevents.Get("arguments")
+					'
+					For Each colarguments As Map In arguments
+						Dim colargumentsname As String = colarguments.GetDefault("name","")
+						Dim colargumentsdescription As String = colevents.GetDefault("description","")
+						'
+						If colargumentsname = "" Then Continue
+						'
+						'save the event
+						Dim eventt As Map = CreateMap()
+						eventt.put("argument", colargumentsname)
+						eventt.put("description",colargumentsdescription)
+						'
+						If colarguments.containskey("type") Then
+							Dim colargumentstype As String = colarguments.Get("type")
+							colargumentstype = CleanArgument(colargumentstype)
+							eventt.put("type", colargumentstype)
+						Else
+							eventt.put("type", "Object")
+						End If
+						
+						eventl.add(eventt)
+					Next
+					event.put("arguments", eventl)
+				End If
+				compEvents.Add(event)
+			Next
+		End If
+		comp.put("events", compEvents)
+		'add style
+		Dim mstyles As List = BANanoShared.NewList
+		mstyles.AddAll(Array("border-color","border-style","border-width","border-radius","margin-top","margin-right","margin-bottom"))
+		mstyles.AddAll(Array("margin-left","padding-top","padding-right","padding-bottom","padding-left"))
+		'
+		Dim compStyles As List = BANanoShared.NewList
+		'
+		For Each mse As String In mstyles
+			Dim mstyle As Map = CreateMap()
+			mstyle.put("stylename", mse)
+			mstyle.put("styletype","String")
+			mstyle.put("stylehasset", "Yes")
+			mstyle.put("stylehasget", "Yes")
+			mstyle.put("styleonsub", "No")
+			mstyle.put("styleoninit", "No")
+			mstyle.put("styledesigner", "Yes")
+			mstyle.put("defaultvalue", "")
+			mstyle.put("styleoptions", "")
+			
+			Select Case mse
+			Case "border-style"
+				mstyle.put("styleoptions", "dashed|dotted|double|groove|hidden|inset|none|outset|ridge|solid")
+			Case "border-color"
+				mstyle.put("styleoptions", "amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
+			End Select			
+			compStyles.Add(mstyle)
+		Next
+		comp.put("styles", compStyles)
+		'save them as map
+		components.put(colname, comp)
+	Next
+	'
+	vm.hideloading
+	'save the components
+	vm.SetData("components", components)
+	vm.ShowSnackBarSuccess($"${components.size} components processed!"$)
+	'
+	Log(components)
+	
+End Sub
+
+
 
 'show the page
 Sub Show
@@ -114,6 +636,13 @@ Sub DeleteRecord_Components(RecordID As String)
 	rsClasses.Delete(RecordID)
 	rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
 	rsClasses.FromJSON
+	'delete events
+	Dim rsEvents As BANanoMySQLE
+	rsEvents.Initialize("bananocvc", "events", "componentid", "componentid")
+	rsEvents.SchemaAddInt(Array("componentid"))
+	rsEvents.Delete(RecordID)
+	rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)
+	rsEvents.FromJSON
 	
 	'execute code to refresh listing for Components
 	vm.CallMethod("SelectAll_Components")
@@ -131,6 +660,7 @@ Sub SelectAll_Components
 	Dim rsComponents As BANanoMySQLE
 	'initialize table for table creation
 	rsComponents.Initialize("bananocvc", "components", "componentid", "componentid")
+	rsComponents.SchemaAddInt(Array("projectid"))
 	Dim cw As Map = CreateMap()
 	cw.put("projectid", sprojectid)
 	rsComponents.SelectWhere("components", Array("*"), cw, Array("="), Array("componenttag"))
@@ -250,7 +780,6 @@ Sub CreateDialog_Components
 	txtcomponentdescription.SetVisible(True)
 	dlgComponents.Container.AddControl(txtcomponentdescription.textfield, txtcomponentdescription.tostring, 3, 1, 0, 0, 0, 0, 12, 9, 9, 9)
 
-
 	vm.AddDialog(dlgComponents)
 End Sub
 
@@ -306,11 +835,38 @@ Sub btnCancelComponents_click(e As BANanoEvent)
 	dlgComponents.Hide
 End Sub
 
+
+Sub menuImportItems_click(e As BANanoEvent)
+	Dim menuID As String = vm.getidfromevent(e)
+	Select Case menuID
+	Case "bootstrapvuewebtypes"
+		'file select
+		vm.ShowFileSelect("bvwebtypes")
+		'
+	Case "bootstrapvuetags"
+		vm.ShowFileSelect("bvtags")
+	
+	Case "bootstrapvueattributes"
+		vm.ShowFileSelect("bvattributes")
+	End Select
+End Sub
+
 Sub CreateDataTable_components
 	dtcomponents = vm.CreateDataTable("dtcomponents", "componentid", Me)
 	dtcomponents.SetTitle("Components")
 	dtcomponents.SetSearchbox(True)
+	dtcomponents.AddDivider
 	dtcomponents.SetAddNew("btnNewComponent", "mdi-plus", "Add a new component")
+	dtcomponents.AddDivider
+	'menu to import bootstrap
+	Dim menuImport As VMMenu
+	menuImport.Initialize(vue, "menuImport", Me)
+	menuImport.SetIcon("mdi-database-plus")
+	menuImport.AddItem("bootstrapvuewebtypes","","","WebTypes.JSON","","")
+	menuImport.AddItem("bootstrapvuetags","","","Tags.JSON","","")
+	menuImport.AddItem("bootstrapvueattributes","","","Attributes.JSON","","")
+	'
+	dtcomponents.AddMenu(menuImport)
 	dtcomponents.SetItemsperpage("1000")
 	dtcomponents.SetMobilebreakpoint("600")
 	dtcomponents.SetMultisort(True)
@@ -326,4 +882,48 @@ Sub CreateDataTable_components
 	dtcomponents.SetIconDimensions1("delete", "24px", "error","80")
 	dtcomponents.SetIconDimensions1("menu", "24px", "orange","80")
 	cont.AddControl(dtcomponents.DataTable, dtcomponents.tostring, 2, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+End Sub
+
+'clean the attribute type
+Sub CleanType(cType As String) As String
+	cType = cType.replace("[","")
+	cType = cType.replace("}","")
+	cType = cType.replace("{","")
+	cType = cType.replace("]","")
+	cType = cType.replace("Date", "string")
+	cType = cType.replace("date", "string")
+	cType = cType.replace("HTMLElement", "string")
+	cType = cType.replace("File", "string")
+	cType = cType.replace("SVGElement", "string")
+	cType = cType.replace("RegExp", "string")
+	cType = cType.replace("function", "string")
+	cType = cType.replace("object", "string")
+	cType = cType.replace("number", "string")
+	cType = cType.replace("any", "string")
+	cType = cType.replace("dataoptions", "Object")
+	cType = cType.replace("tableheader", "Object")
+	cType = vue.MvDistinct("|", cType)
+	cType = cType.replace("array|string", "string")
+	cType = cType.replace("boolean|array", "boolean")
+	cType = cType.replace("boolean|string", "string")
+	cType = cType.replace("string|array", "string")
+	cType = cType.replace("string|boolean","string")
+	cType = cType.replace("array", "List")
+	If cType = "" Then cType = "string"
+	Return cType	
+End Sub
+
+Sub CleanArgument(etype As String) As String
+	etype = etype.tolowercase
+	If etype.Startswith("boolean") Then etype = "Boolean"
+	If etype.EndsWith("event") Then etype = "BANanoEvent"
+	If etype.startswith("file") Then etype = "List"
+	If etype.Startswith("number") Then etype = "Int"
+	If etype.startswith("any") Then etype = "Object"
+	If etype.startswith("array") Then etype = "List"
+	If etype.startswith("object") Then etype = "Object"
+	If etype.startswith("string") Then etype = "String"
+	If etype.startswith("void") Then etype = "Object"
+	If etype.startswith("{") Then etype = "Object"
+	Return etype
 End Sub

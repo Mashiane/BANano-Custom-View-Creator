@@ -109,6 +109,7 @@ Sub tabs_click(tabID As String)
 	Dim cprojectname As String = mproject.getdefault("projectname","")
 	Dim cprojectprefix As String = mproject.getdefault("projectprefix", "")
 	Dim cprojectversion As String = mproject.getdefault("projectversion", "")
+	Dim cprojectvue As String = mproject.getdefault("projectvue", "")
 	'
 	Dim ccomponentdescription As String = mcomponent.getdefault("componentdescription","")
 	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
@@ -117,6 +118,7 @@ Sub tabs_click(tabID As String)
 	'get all attributes for component
 	Dim rsAttributes As BANanoMySQLE
 	rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+	rsAttributes.SchemaAddInt(Array("componentid"))
 	'generate & run command to select all records
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
@@ -126,6 +128,7 @@ Sub tabs_click(tabID As String)
 	'get all styles for component
 	Dim rsStyles As BANanoMySQLE
 	rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
+	rsStyles.SchemaAddInt(Array("componentid"))
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
 	rsStyles.SelectWhere("styles", Array("*"), aw, Array("="), Array("stylename"))
@@ -134,6 +137,7 @@ Sub tabs_click(tabID As String)
 	'get all classes for component
 	Dim rsClasses As BANanoMySQLE
 	rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
+	rsClasses.SchemaAddInt(Array("componentid"))
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
 	rsClasses.SelectWhere("classes", Array("*"), aw, Array("="), Array("classname"))
@@ -142,6 +146,7 @@ Sub tabs_click(tabID As String)
 	'get all events for component
 	Dim rsEvents As BANanoMySQLE
 	rsEvents.Initialize("bananocvc", "events", "eventid", "eventid")
+	rsEvents.SchemaAddInt(Array("componentid"))
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
 	rsEvents.SelectWhere("events", Array("*"), aw, Array("="), Array("eventname"))
@@ -156,6 +161,7 @@ Sub tabs_click(tabID As String)
 	Dim builder As clsBuilder
 	builder.Initialize(vm, ccomponenttag, sCompName, rsAttributes.Result, _
 	rsStyles.Result, rsClasses.Result, rsEvents.Result)
+	builder.projectvue = cprojectvue
 	'
 	Dim sb4xcode As String = builder.CreateCustomView
 	'
@@ -225,6 +231,11 @@ Sub CreateContainer_tabAttributes As VMContainer
 	dtattributes = vm.CreateDataTable("dtattributes", "attrid", Me)
 	dtattributes.SetTitle("Attributes")
 	dtattributes.SetSearchbox(True)
+	dtattributes.AddDivider
+	dtattributes.CardTitle.AddFab("btnGlobalAttributes", "playlist_add", "purple", "",  "Add global attributes","")
+	dtattributes.AddDivider
+	dtattributes.CardTitle.AddFab("btnVuejs", "mdi-vuejs", "blue", "", "Add VueJS attributes", "")
+	dtattributes.AddDivider
 	dtattributes.SetAddNew("btnNewAttributes", "mdi-plus", "Add a new attribute")
 	dtattributes.SetItemsperpage("1000")
 	dtattributes.SetMobilebreakpoint("600")
@@ -238,6 +249,7 @@ Sub CreateContainer_tabAttributes As VMContainer
 	dtattributes.AddColumn1("attrdesigner", "Designer Property", "text",0,False,"start")
 	dtattributes.AddColumn1("attrhasset", "Set", "text",0,False,"start")
 	dtattributes.AddColumn1("attrhasget", "Get", "text",0,False,"start")
+	dtattributes.AddColumn1("attrexplode", "Easy", "text",0,False,"start")
 	dtattributes.AddColumn1("attronsub", "OnSub", "text",0,False,"start")
 	dtattributes.AddColumn1("attroninit", "OnSignature", "text",0,False,"start")
 	dtattributes.SetEdit(True)
@@ -248,6 +260,163 @@ Sub CreateContainer_tabAttributes As VMContainer
 	Return conttabAttributes
 End Sub
 
+'add vuejs attributes
+Sub btnVuejs_click(e As BANanoEvent)
+	Dim mproject As Map = vm.GetData("project")
+	Dim mcomponent As Map =	vm.GetData("component")
+	If BANano.IsNull(mproject) Or BANano.IsNull(mcomponent) Then Return
+	vm.ShowLoading
+	'
+	Dim cprojectid As String = mproject.getdefault("projectid","")
+	Dim cprojectname As String = mproject.getdefault("projectname","")
+	Dim cprojectprefix As String = mproject.getdefault("projectprefix", "")
+	Dim cprojectversion As String = mproject.getdefault("projectversion", "")
+	'
+	Dim ccomponentdescription As String = mcomponent.getdefault("componentdescription","")
+	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
+	Dim ccomponenttag As String = mcomponent.getdefault("componenttag", "")
+	'
+	'add margins and padding
+	'select all attributes for this component, we will search through them
+	Dim rsAttributes As BANanoMySQLE
+	'initialize table for table creation
+	rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+	rsAttributes.SchemaAddInt(Array("componentid"))
+	Dim aw As Map = CreateMap()
+	aw.put("componentid", scomponentid)
+	rsAttributes.SelectWhere("attributes", Array("*"), aw, Array("="), Array("attrname"))
+	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+	rsAttributes.FromJSON
+	'
+	Dim mstylename As Map = CreateMap()
+	'
+	For Each sr As Map In rsAttributes.Result
+		Dim sstylename As String = sr.get("attrname")
+		mstylename.put(sstylename, sstylename)
+	Next
+	'define the styles to add
+	Dim styles2add As List = vm.NewList
+	styles2add.addall(Array("key", "parent-id", "v-bind:class", "v-bind:style", "ref", _
+	"v-else", "v-else-if", "v-for", "v-html", "v-if", "v-model","v-show","v-text"))
+	
+	'do a search for each style
+	For Each styleName As String In styles2add
+		If mstylename.ContainsKey(styleName) Then Continue
+		'add the new style
+		Dim ns As Map = CreateMap()
+		ns.put("attrname", styleName)
+		ns.put("projectid", cprojectid)
+		ns.put("componentid", ccomponentid)
+		ns.put("attrtype", "String")
+		ns.put("attrhasset", "Yes")
+		ns.put("attrhasget", "Yes")
+		ns.put("attronsub", "No")
+		ns.put("attroninit", "No")
+		ns.put("attrdesigner", "Yes")
+		ns.put("defaultvalue", "")
+		ns.put("attrdescription", "")
+		ns.put("attroptions", "")
+		ns.put("attrmin", "")
+		ns.put("attrmax", "")
+		ns.put("attrexplode", "No")
+		'
+		Select Case styleName
+		Case "v-cloak", "v-once", "v-pre"
+			ns.put("attrtype", "Boolean")
+		End Select
+		
+		'add to the database
+		rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+		rsAttributes.SchemaAddInt(Array("projectid","componentid"))
+		rsAttributes.Insert1(ns)
+		rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+		rsAttributes.FromJSON
+		'
+	Next
+	'reload styles
+	vm.CallMethod("SelectAll_Attributes")
+	vm.HideLoading
+End Sub
+
+Sub btnGlobalAttributes_click(e As BANanoEvent)
+	Dim mproject As Map = vm.GetData("project")
+	Dim mcomponent As Map =	vm.GetData("component")
+	If BANano.IsNull(mproject) Or BANano.IsNull(mcomponent) Then Return
+	vm.ShowLoading
+	'
+	Dim cprojectid As String = mproject.getdefault("projectid","")
+	Dim cprojectname As String = mproject.getdefault("projectname","")
+	Dim cprojectprefix As String = mproject.getdefault("projectprefix", "")
+	Dim cprojectversion As String = mproject.getdefault("projectversion", "")
+	'
+	Dim ccomponentdescription As String = mcomponent.getdefault("componentdescription","")
+	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
+	Dim ccomponenttag As String = mcomponent.getdefault("componenttag", "")
+	'
+	'add margins and padding
+	'select all attributes for this component, we will search through them
+	Dim rsAttributes As BANanoMySQLE
+	'initialize table for table creation
+	rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+	rsAttributes.SchemaAddInt(Array("componentid"))
+	Dim aw As Map = CreateMap()
+	aw.put("componentid", scomponentid)
+	rsAttributes.SelectWhere("attributes", Array("*"), aw, Array("="), Array("attrname"))
+	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+	rsAttributes.FromJSON
+	'
+	Dim mstylename As Map = CreateMap()
+	'
+	For Each sr As Map In rsAttributes.Result
+		Dim sstylename As String = sr.get("attrname")
+		mstylename.put(sstylename, sstylename)
+	Next
+	'define the styles to add
+	Dim styles2add As List = vm.NewList
+	styles2add.addall(Array("accesskey", "contenteditable", "contextmenu", "dir", _
+	"draggable", "dropzone", "hidden", "lang", "spellcheck", "tabindex", "title"))
+	'
+	'do a search for each style
+	For Each styleName As String In styles2add
+		If mstylename.ContainsKey(styleName) Then Continue
+		'add the new style
+		Dim ns As Map = CreateMap()
+		ns.put("attrname", styleName)
+		ns.put("projectid", cprojectid)
+		ns.put("componentid", ccomponentid)
+		ns.put("attrtype", "String")
+		ns.put("attrhasset", "Yes")
+		ns.put("attrhasget", "Yes")
+		ns.put("attronsub", "No")
+		ns.put("attroninit", "No")
+		ns.put("attrdesigner", "Yes")
+		ns.put("defaultvalue", "")
+		ns.put("attrdescription", "")
+		ns.put("attroptions", "")
+		ns.put("attrmin", "")
+		ns.put("attrmax", "")
+		ns.put("attrexplode", "No")
+		'
+		If styleName = "contenteditable" Then ns.put("attrtype", "Boolean")
+		If styleName = "dir" Then ns.put("attroptions", "ltr|rtl")
+		If styleName = "draggable" Then ns.put("attroptions", "true|false|auto")
+		If styleName = "dropzone" Then ns.put("attroptions", "copy|move|link")
+		If styleName = "hidden" Then ns.put("attrtype", "Boolean")
+		If styleName = "spellcheck" Then ns.put("attrtype", "Boolean")
+		
+		
+		'add to the database
+		rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+		rsAttributes.SchemaAddInt(Array("projectid","componentid"))
+		rsAttributes.Insert1(ns)
+		rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+		rsAttributes.FromJSON
+		'
+	Next
+	'reload styles
+	vm.CallMethod("SelectAll_Attributes")
+	vm.HideLoading
+End Sub
 
 'Create the Styles tab
 Sub CreateContainer_tabStyles As VMContainer
@@ -257,7 +426,9 @@ Sub CreateContainer_tabStyles As VMContainer
 	dtstyles = vm.CreateDataTable("dtstyles", "styleid", Me)
 	dtstyles.SetTitle("Styles")
 	dtstyles.SetSearchbox(True)
-	dtstyles.AddButton1("btnAddMarginsPadding","", "Margins & Padding", "Add Margins & Padding")
+	dtstyles.AddDivider
+	dtstyles.CardTitle.AddFab("btnAddMarginsPadding", "playlist_add", "cyan", "",  "Add margins and padding","")
+	dtstyles.AddDivider
 	dtstyles.SetAddNew("btnNewStyle", "mdi-plus", "Add a new style")
 	dtstyles.SetItemsperpage("1000")
 	dtstyles.SetMobilebreakpoint("600")
@@ -271,6 +442,7 @@ Sub CreateContainer_tabStyles As VMContainer
 	dtstyles.AddColumn1("styledesigner", "Designer Property", "text",0,False,"start")
 	dtstyles.AddColumn1("stylehasset", "Set", "text",0,False,"start")
 	dtstyles.AddColumn1("stylehasget", "Get", "text",0,False,"start")
+	dtstyles.AddColumn1("styleexplode", "Easy", "text",0,False,"start")
 	dtstyles.AddColumn1("styleonsub", "OnSub", "text",0,False,"start")
 	dtstyles.AddColumn1("styleoninit", "OnSignature", "text",0,False,"start")
 	dtstyles.SetEdit(True)
@@ -305,6 +477,7 @@ Sub btnAddMarginsPadding_click(e As BANanoEvent)
 	Dim rsStyles As BANanoMySQLE
 	'initialize table for table creation
 	rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
+	rsStyles.SchemaAddInt(Array("componentid"))
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
 	rsStyles.SelectWhere("styles", Array("*"), aw, Array("="), Array("stylename"))
@@ -320,7 +493,8 @@ Sub btnAddMarginsPadding_click(e As BANanoEvent)
 	'define the styles to add
 	Dim styles2add As List = vm.NewList
 	styles2add.addall(Array("margin-top", "margin-bottom", "margin-left", "margin-right", _
-	"padding-top", "padding-bottom", "padding-left", "padding-right"))
+	"border-style", "border-color", "border-radius", "padding-top", "padding-bottom", "padding-left", "padding-right","width", "border-width", "height","margin","padding","border", "background-image", "background-repeat", _
+	"font-size", "text-align", "font-weight", "text-decoration", "font-style", "font-family", "color", "background-color"))
 	'
 	'do a search for each style
 	For Each styleName As String In styles2add
@@ -341,6 +515,29 @@ Sub btnAddMarginsPadding_click(e As BANanoEvent)
 		ns.put("styleoptions", "")
 		ns.put("stylemin", "")
 		ns.put("stylemax", "")
+		ns.put("styleexplode", "No")
+		'
+		If styleName = "text-align" Then ns.put("styleoptions", "left|center|right|justify")
+		If styleName = "font-weight" Then ns.put("styleoptions", "normal|bold|bolder|lighter|initial|inherit")
+		If styleName = "font-style" Then ns.put("styleoptions", "normal|italic|oblique|initial|inherit")
+		If styleName = "color" Then ns.put("styleoptions", "amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
+		If styleName = "background-color" Then ns.put("styleoptions", "amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
+		'
+		If styleName = "border-style" Then
+			ns.put("styleoptions", "none|hidden|dotted|dashed|solid|double|groove|ridge|inset|outset|initial|inherit")
+		End If
+		If styleName = "border-color" Then
+			ns.put("styleoptions", "amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
+		End If
+		
+		If styleName = "background-repeat" Then
+			ns.put("styleoptions", "repeat|repeat-x|repeat-y|no-repeat|initial|inherit")
+		End If
+		'
+		If styleName = "background-repeat" Then
+			ns.put("styleoptions", "repeat|repeat-x|repeat-y|no-repeat|initial|inherit")
+		End If
+		
 		'add to the database
 		rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
 		rsStyles.SchemaAddInt(Array("projectid","componentid"))
@@ -383,6 +580,7 @@ Sub CreateContainer_tabClasses As VMContainer
 	dtclasses = vm.CreateDataTable("dtclasses", "classid", Me)
 	dtclasses.SetTitle("Classes")
 	dtclasses.SetSearchbox(True)
+	dtclasses.Adddivider
 	dtclasses.SetAddNew("btnNewClasse", "mdi-plus", "Add a new classe")
 	dtclasses.SetItemsperpage("100")
 	dtclasses.SetMobilebreakpoint("600")
@@ -418,6 +616,7 @@ Sub CreateContainer_tabEvents As VMContainer
 	dtevents = vm.CreateDataTable("dtevents", "eventid", Me)
 	dtevents.SetTitle("Events")
 	dtevents.SetSearchbox(True)
+	dtevents.AddDivider
 	dtevents.SetAddNew("btnNewEvents", "mdi-plus", "Add a new events")
 	dtevents.SetItemsperpage("10")
 	dtevents.SetMobilebreakpoint("600")
@@ -468,6 +667,7 @@ Sub SelectAll_Attributes
 	Dim rsAttributes As BANanoMySQLE
 	'initialize table for table creation
 	rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+	rsAttributes.SchemaAddInt(Array("componentid"))
 	'generate & run command to select all records
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
@@ -584,11 +784,12 @@ Sub CreateDialog_Attributes
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
 
-	Dim txtattrname As VMTextField = vm.NewTextField(Me, False, "txtattrname", "attrname", "Attribute", "", True, "", 0, "", "The attribute is required!", 0)
+	Dim txtattrname As VMTextField = vm.NewTextField(Me, False, "txtattrname", "attrname", "Attribute(s) - use comma for multiple", "", True, "", 0, "", "The attribute is required!", 0)
 	txtattrname.SetFieldType("string")
 	txtattrname.SetAutoFocus(True)
 	txtattrname.SetVisible(True)
-	dlgAttributes.Container.AddControl(txtattrname.textfield, txtattrname.tostring, 2, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	txtattrname.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(txtattrname.textfield, txtattrname.tostring, 2, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -597,7 +798,7 @@ Sub CreateDialog_Attributes
 	txtdefaultvalue.SetFieldType("string")
 	txtdefaultvalue.SetHideDetails(True)
 	txtdefaultvalue.SetVisible(True)
-	dlgAttributes.Container.AddControl(txtdefaultvalue.textfield, txtdefaultvalue.tostring, 2, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgAttributes.Container.AddControl(txtdefaultvalue.textfield, txtdefaultvalue.tostring, 3, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -608,7 +809,8 @@ Sub CreateDialog_Attributes
 	Dim rdattrtype As VMRadioGroup = vm.NewRadioGroup(Me, False, "rdattrtype", "attrtype", "Type", "String", attrtypemap, True, False, 0)
 	rdattrtype.SetFieldType("string")
 	rdattrtype.SetVisible(True)
-	dlgAttributes.Container.AddControl(rdattrtype.RadioGroup, rdattrtype.tostring, 3, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	rdattrtype.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(rdattrtype.RadioGroup, rdattrtype.tostring, 4, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -616,7 +818,8 @@ Sub CreateDialog_Attributes
 	Dim swtattrdesigner As VMCheckBox = vm.NewSwitch(Me, False, "swtattrdesigner", "attrdesigner", "Designer Property", "Yes", "No", False, 0)
 	swtattrdesigner.SetFieldType("string")
 	swtattrdesigner.SetVisible(True)
-	dlgAttributes.Container.AddControl(swtattrdesigner.CheckBox, swtattrdesigner.tostring, 3, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtattrdesigner.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(swtattrdesigner.CheckBox, swtattrdesigner.tostring, 4, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -625,7 +828,7 @@ Sub CreateDialog_Attributes
 	txtattrdescription.SetFieldType("string")
 	txtattrdescription.SetHideDetails(True)
 	txtattrdescription.SetVisible(True)
-	dlgAttributes.Container.AddControl(txtattrdescription.textfield, txtattrdescription.tostring, 4, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+	dlgAttributes.Container.AddControl(txtattrdescription.textfield, txtattrdescription.tostring, 5, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -634,7 +837,8 @@ Sub CreateDialog_Attributes
 	txtattroptions.SetFieldType("string")
 	txtattroptions.SetHideDetails(True)
 	txtattroptions.SetVisible(True)
-	dlgAttributes.Container.AddControl(txtattroptions.textfield, txtattroptions.tostring, 5, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+	txtattroptions.SetTextArea
+	dlgAttributes.Container.AddControl(txtattroptions.textfield, txtattroptions.tostring, 6, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -642,7 +846,8 @@ Sub CreateDialog_Attributes
 	Dim swtattrhasset As VMCheckBox = vm.NewSwitch(Me, False, "swtattrhasset", "attrhasset", "Has Set", "Yes", "No", False, 0)
 	swtattrhasset.SetFieldType("string")
 	swtattrhasset.SetVisible(True)
-	dlgAttributes.Container.AddControl(swtattrhasset.CheckBox, swtattrhasset.tostring, 6, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtattrhasset.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(swtattrhasset.CheckBox, swtattrhasset.tostring, 7, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -650,7 +855,8 @@ Sub CreateDialog_Attributes
 	Dim swtattrhasget As VMCheckBox = vm.NewSwitch(Me, False, "swtattrhasget", "attrhasget", "Has Get", "Yes", "No", False, 0)
 	swtattrhasget.SetFieldType("string")
 	swtattrhasget.SetVisible(True)
-	dlgAttributes.Container.AddControl(swtattrhasget.CheckBox, swtattrhasget.tostring, 6, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtattrhasget.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(swtattrhasget.CheckBox, swtattrhasget.tostring, 7, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -658,7 +864,8 @@ Sub CreateDialog_Attributes
 	Dim txtattrmin As VMTextField = vm.NewTextField(Me, False, "txtattrmin", "attrmin", "Min Value", "", False, "", 0, "", "", 0)
 	txtattrmin.SetFieldType("string")
 	txtattrmin.SetVisible(True)
-	dlgAttributes.Container.AddControl(txtattrmin.textfield, txtattrmin.tostring, 7, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	txtattrmin.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(txtattrmin.textfield, txtattrmin.tostring, 8, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -666,7 +873,8 @@ Sub CreateDialog_Attributes
 	Dim txtattrmax As VMTextField = vm.NewTextField(Me, False, "txtattrmax", "attrmax", "Max Value", "", False, "", 0, "", "", 0)
 	txtattrmax.SetFieldType("string")
 	txtattrmax.SetVisible(True)
-	dlgAttributes.Container.AddControl(txtattrmax.textfield, txtattrmax.tostring, 7, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	txtattrmax.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(txtattrmax.textfield, txtattrmax.tostring, 8, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -674,7 +882,8 @@ Sub CreateDialog_Attributes
 	Dim swtattronsub As VMCheckBox = vm.NewSwitch(Me, False, "swtattronsub", "attronsub", "On Sub", "Yes", "No", False, 0)
 	swtattronsub.SetFieldType("string")
 	swtattronsub.SetVisible(True)
-	dlgAttributes.Container.AddControl(swtattronsub.CheckBox, swtattronsub.tostring, 8, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtattronsub.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(swtattronsub.CheckBox, swtattronsub.tostring, 9, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
@@ -682,7 +891,8 @@ Sub CreateDialog_Attributes
 	Dim swtattroninit As VMCheckBox = vm.NewSwitch(Me, False, "swtattroninit", "attroninit", "On Signature", "Yes", "No", False, 0)
 	swtattroninit.SetFieldType("string")
 	swtattroninit.SetVisible(True)
-	dlgAttributes.Container.AddControl(swtattroninit.CheckBox, swtattroninit.tostring, 8, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtattroninit.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(swtattroninit.CheckBox, swtattroninit.tostring, 9, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	vm.AddDialog(dlgAttributes)
@@ -706,15 +916,22 @@ Sub btnOkAttributes_click(e As BANanoEvent)
 	'check mode
 	Select Case Mode
 		Case "A"
-			'initialize table for insert
-			rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
-			'define schema for record
-			rsAttributes.SchemaFromDesign(dlgAttributes.Container)
-			'insert a record
-			rsAttributes.Insert1(Record)
-			'generate & run command to insert record
-			rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
-			rsAttributes.FromJSON
+			'we might have multiple attributes
+			Dim sattrname As String = Record.get("attrname")
+			Dim spattrname As List = BANanoShared.StrParse(",", sattrname)
+			For Each sattrname As String In spattrname
+				'for each attribute
+				Record.put("attrname", sattrname)
+				'initialize table for insert
+				rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+				'define schema for record
+				rsAttributes.SchemaFromDesign(dlgAttributes.Container)
+				'insert a record
+				rsAttributes.Insert1(Record)
+				'generate & run command to insert record
+				rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+				rsAttributes.FromJSON
+			Next
 		Case "E"
 			'read record id
 			Dim RecID As String = Record.Get("attrid")
@@ -772,6 +989,7 @@ Sub SelectAll_Styles
 	Dim rsStyles As BANanoMySQLE
 	'initialize table for table creation
 	rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
+	rsStyles.SchemaAddInt(Array("componentid"))
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
 	rsStyles.SelectWhere("styles", Array("*"), aw, Array("="), Array("stylename"))
@@ -933,11 +1151,12 @@ Sub CreateDialog_Styles
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
 
-	Dim txtstylename As VMTextField = vm.NewTextField(Me, False, "txtstylename", "stylename", "Style", "", True, "", 0, "", "The style is required!", 0)
+	Dim txtstylename As VMTextField = vm.NewTextField(Me, False, "txtstylename", "stylename", "Style(s) - separate by comma for multiple", "", True, "", 0, "", "The style is required!", 0)
 	txtstylename.SetFieldType("string")
 	txtstylename.SetAutoFocus(True)
 	txtstylename.SetVisible(True)
-	dlgStyles.Container.AddControl(txtstylename.textfield, txtstylename.tostring, 2, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	txtstylename.SetHideDetails(True)
+	dlgStyles.Container.AddControl(txtstylename.textfield, txtstylename.tostring, 2, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -945,7 +1164,8 @@ Sub CreateDialog_Styles
 	Dim txtdefaultvalue As VMTextField = vm.NewTextField(Me, False, "txtdefaultvalue", "defaultvalue", "Default Value", "", False, "", 0, "", "The default value is required!", 0)
 	txtdefaultvalue.SetFieldType("string")
 	txtdefaultvalue.SetVisible(True)
-	dlgStyles.Container.AddControl(txtdefaultvalue.textfield, txtdefaultvalue.tostring, 2, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	txtdefaultvalue.SetHideDetails(True)
+	dlgStyles.Container.AddControl(txtdefaultvalue.textfield, txtdefaultvalue.tostring, 3, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -956,7 +1176,8 @@ Sub CreateDialog_Styles
 	rdstyletype.SetFieldType("string")
 	rdstyletype.SetVisible(True)
 	rdstyletype.SetDisabled(True)	
-	dlgStyles.Container.AddControl(rdstyletype.RadioGroup, rdstyletype.tostring, 3, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	rdstyletype.SetHideDetails(True)
+	dlgStyles.Container.AddControl(rdstyletype.RadioGroup, rdstyletype.tostring, 4, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -965,7 +1186,8 @@ Sub CreateDialog_Styles
 	swtstyledesigner.SetFieldType("string")
 	swtstyledesigner.SetValue("Yes")
 	swtstyledesigner.SetVisible(True)
-	dlgStyles.Container.AddControl(swtstyledesigner.CheckBox, swtstyledesigner.tostring, 3, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtstyledesigner.SetHideDetails(True)
+	dlgStyles.Container.AddControl(swtstyledesigner.CheckBox, swtstyledesigner.tostring, 4, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -973,7 +1195,8 @@ Sub CreateDialog_Styles
 	Dim txtstyledescription As VMTextField = vm.NewTextField(Me, False, "txtstyledescription", "styledescription", "Description", "", False, "", 200, "", "", 0)
 	txtstyledescription.SetFieldType("string")
 	txtstyledescription.SetVisible(True)
-	dlgStyles.Container.AddControl(txtstyledescription.textfield, txtstyledescription.tostring, 4, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+	txtstyledescription.SetHideDetails(True)
+	dlgStyles.Container.AddControl(txtstyledescription.textfield, txtstyledescription.tostring, 5, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -981,7 +1204,9 @@ Sub CreateDialog_Styles
 	Dim txtstyleoptions As VMTextField = vm.NewTextField(Me, False, "txtstyleoptions", "styleoptions", "Options", "", False, "", 0, "", "", 0)
 	txtstyleoptions.SetFieldType("string")
 	txtstyleoptions.SetVisible(True)
-	dlgStyles.Container.AddControl(txtstyleoptions.textfield, txtstyleoptions.tostring, 5, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+	txtstyleoptions.SetHideDetails(True)
+	txtstyleoptions.SetTextArea
+	dlgStyles.Container.AddControl(txtstyleoptions.textfield, txtstyleoptions.tostring, 6, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -990,7 +1215,8 @@ Sub CreateDialog_Styles
 	swtstylehasset.SetFieldType("string")
 	swtstylehasset.SetValue("Yes")
 	swtstylehasset.SetVisible(True)
-	dlgStyles.Container.AddControl(swtstylehasset.CheckBox, swtstylehasset.tostring, 6, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtstylehasset.SetHideDetails(True)
+	dlgStyles.Container.AddControl(swtstylehasset.CheckBox, swtstylehasset.tostring, 7, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -999,7 +1225,8 @@ Sub CreateDialog_Styles
 	swtstylehasget.SetFieldType("string")
 	swtstylehasget.SetValue("Yes")
 	swtstylehasget.SetVisible(True)
-	dlgStyles.Container.AddControl(swtstylehasget.CheckBox, swtstylehasget.tostring, 6, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtstylehasget.SetHideDetails(True)
+	dlgStyles.Container.AddControl(swtstylehasget.CheckBox, swtstylehasget.tostring, 7, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -1008,7 +1235,8 @@ Sub CreateDialog_Styles
 	swtstyleonsub.SetFieldType("string")
 	swtstyleonsub.SetValue("Yes")
 	swtstyleonsub.SetVisible(True)
-	dlgStyles.Container.AddControl(swtstyleonsub.CheckBox, swtstyleonsub.tostring, 7, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtstyleonsub.SetHideDetails(True)
+	dlgStyles.Container.AddControl(swtstyleonsub.CheckBox, swtstyleonsub.tostring, 8, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
@@ -1017,7 +1245,8 @@ Sub CreateDialog_Styles
 	swtstyleoninit.SetFieldType("string")
 	swtstyleoninit.SetValue("Yes")
 	swtstyleoninit.SetVisible(True)
-	dlgStyles.Container.AddControl(swtstyleoninit.CheckBox, swtstyleoninit.tostring, 7, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	swtstyleoninit.SetHideDetails(True)
+	dlgStyles.Container.AddControl(swtstyleoninit.CheckBox, swtstyleoninit.tostring, 8, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 	vm.AddDialog(dlgStyles)
 End Sub
@@ -1040,15 +1269,22 @@ Sub btnOkStyles_click(e As BANanoEvent)
 	'check mode
 	Select Case Mode
 		Case "A"
-			'initialize table for insert
-			rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
-			'define schema for record
-			rsStyles.SchemaFromDesign(dlgStyles.Container)
-			'insert a record
-			rsStyles.Insert1(Record)
-			'generate & run command to insert record
-			rsStyles.JSON = BANano.CallInlinePHPWait(rsStyles.MethodName, rsStyles.Build)
-			rsStyles.FromJSON
+			'we might have multiple attributes
+			Dim sstylename As String = Record.get("stylename")
+			Dim spstylename As List = BANanoShared.StrParse(",", sstylename)
+			For Each sstylename As String In spstylename
+				'for each attribute
+				Record.put("stylename", sstylename)
+				'initialize table for insert
+				rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
+				'define schema for record
+				rsStyles.SchemaFromDesign(dlgStyles.Container)
+				'insert a record
+				rsStyles.Insert1(Record)
+				'generate & run command to insert record
+				rsStyles.JSON = BANano.CallInlinePHPWait(rsStyles.MethodName, rsStyles.Build)
+				rsStyles.FromJSON
+			Next
 		Case "E"
 			'read record id
 			Dim RecID As String = Record.Get("styleid")
@@ -1106,6 +1342,7 @@ Sub SelectAll_Classes
 	Dim rsClasses As BANanoMySQLE
 	'initialize table for table creation
 	rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
+	rsClasses.SchemaAddInt(Array("componentid"))
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
 	rsClasses.SelectWhere("classes", Array("*"), aw, Array("="), Array("classname"))
@@ -1225,7 +1462,7 @@ Sub CreateDialog_Classes
 	txtclassname.SetAutoFocus(True)
 	txtclassname.SetVisible(True)
 	txtclassname.SetHideDetails(True)
-	dlgClasses.Container.AddControl(txtclassname.textfield, txtclassname.tostring, 2, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(txtclassname.textfield, txtclassname.tostring, 2, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1235,7 +1472,7 @@ Sub CreateDialog_Classes
 	txtdefaultvalue.SetDense(True)
 	txtdefaultvalue.SetVisible(True)
 	txtdefaultvalue.SetHideDetails(True)
-	dlgClasses.Container.AddControl(txtdefaultvalue.textfield, txtdefaultvalue.tostring, 2, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(txtdefaultvalue.textfield, txtdefaultvalue.tostring, 3, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1247,7 +1484,7 @@ Sub CreateDialog_Classes
 	rdclasstype.SetDense(True)
 	rdclasstype.SetVisible(True)
 	rdclasstype.SetHideDetails(True)
-	dlgClasses.Container.AddControl(rdclasstype.RadioGroup, rdclasstype.tostring, 3, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(rdclasstype.RadioGroup, rdclasstype.tostring, 4, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1258,7 +1495,7 @@ Sub CreateDialog_Classes
 	swtclassdesigner.SetDense(True)
 	swtclassdesigner.SetVisible(True)
 	swtclassdesigner.SetHideDetails(True)
-	dlgClasses.Container.AddControl(swtclassdesigner.CheckBox, swtclassdesigner.tostring, 3, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(swtclassdesigner.CheckBox, swtclassdesigner.tostring, 4, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 	Dim classaddonconditionkeys As String = "True,False,None"
 	Dim classaddonconditionvalues As String = "True,False,None"
@@ -1267,7 +1504,7 @@ Sub CreateDialog_Classes
 	rdclassaddoncondition.SetFieldType("string")
 	rdclassaddoncondition.SetVisible(True)
 	rdclassaddoncondition.SetHideDetails(True)
-	dlgClasses.Container.AddControl(rdclassaddoncondition.RadioGroup, rdclassaddoncondition.tostring, 4, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+	dlgClasses.Container.AddControl(rdclassaddoncondition.RadioGroup, rdclassaddoncondition.tostring, 5, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1277,7 +1514,7 @@ Sub CreateDialog_Classes
 	txtclassdescription.SetDense(True)
 	txtclassdescription.SetVisible(True)
 	txtclassdescription.SetHideDetails(True)
-	dlgClasses.Container.AddControl(txtclassdescription.textfield, txtclassdescription.tostring, 5, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+	dlgClasses.Container.AddControl(txtclassdescription.textfield, txtclassdescription.tostring, 6, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1288,7 +1525,7 @@ Sub CreateDialog_Classes
 	txtclassoptions.SetVisible(True)
 	txtclassoptions.SetTextArea
 	txtclassoptions.SetHideDetails(True)
-	dlgClasses.Container.AddControl(txtclassoptions.textfield, txtclassoptions.tostring, 6, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+	dlgClasses.Container.AddControl(txtclassoptions.textfield, txtclassoptions.tostring, 7, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1299,7 +1536,7 @@ Sub CreateDialog_Classes
 	swtclasshasset.SetDense(True)
 	swtclasshasset.SetVisible(True)
 	swtclasshasset.SetHideDetails(True)
-	dlgClasses.Container.AddControl(swtclasshasset.CheckBox, swtclasshasset.tostring, 7, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(swtclasshasset.CheckBox, swtclasshasset.tostring, 8, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1310,7 +1547,7 @@ Sub CreateDialog_Classes
 	swtclasshasget.SetDense(True)
 	swtclasshasget.SetVisible(True)
 	swtclasshasget.SetHideDetails(True)
-	dlgClasses.Container.AddControl(swtclasshasget.CheckBox, swtclasshasget.tostring, 7, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(swtclasshasget.CheckBox, swtclasshasget.tostring, 8, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1320,7 +1557,7 @@ Sub CreateDialog_Classes
 	txtclassmin.SetDense(True)
 	txtclassmin.SetVisible(True)
 	txtclassmin.SetHideDetails(True)
-	dlgClasses.Container.AddControl(txtclassmin.textfield, txtclassmin.tostring, 8, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(txtclassmin.textfield, txtclassmin.tostring, 9, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1330,7 +1567,7 @@ Sub CreateDialog_Classes
 	txtclassmax.SetDense(True)
 	txtclassmax.SetVisible(True)
 	txtclassmax.SetHideDetails(True)
-	dlgClasses.Container.AddControl(txtclassmax.textfield, txtclassmax.tostring, 8, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(txtclassmax.textfield, txtclassmax.tostring, 9, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1341,7 +1578,7 @@ Sub CreateDialog_Classes
 	swtclassonsub.SetDense(True)
 	swtclassonsub.SetVisible(True)
 	swtclassonsub.SetHideDetails(True)
-	dlgClasses.Container.AddControl(swtclassonsub.CheckBox, swtclassonsub.tostring, 9, 1, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(swtclassonsub.CheckBox, swtclassonsub.tostring, 10, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
@@ -1352,7 +1589,7 @@ Sub CreateDialog_Classes
 	swtclassoninit.SetDense(True)
 	swtclassoninit.SetVisible(True)
 	swtclassoninit.SetHideDetails(True)
-	dlgClasses.Container.AddControl(swtclassoninit.CheckBox, swtclassoninit.tostring, 9, 2, 0, 0, 0, 0, 12, 6, 6, 6)
+	dlgClasses.Container.AddControl(swtclassoninit.CheckBox, swtclassoninit.tostring, 10, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 	vm.AddDialog(dlgClasses)
 End Sub
 
@@ -1375,15 +1612,22 @@ Sub btnOkClasses_click(e As BANanoEvent)
 	'check mode
 	Select Case Mode
 		Case "A"
-			'initialize table for insert
-			rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
-			'define schema for record
-			rsClasses.SchemaFromDesign(dlgClasses.Container)
-			'insert a record
-			rsClasses.Insert1(Record)
-			'generate & run command to insert record
-			rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
-			rsClasses.FromJSON
+			'we might have multiple attributes
+			Dim sclassname As String = Record.get("classname")
+			Dim spclassname As List = BANanoShared.StrParse(",", sclassname)
+			For Each sclassname As String In spclassname
+				'for each attribute
+				Record.put("classname", sclassname)
+				'initialize table for insert
+				rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
+				'define schema for record
+				rsClasses.SchemaFromDesign(dlgClasses.Container)
+				'insert a record
+				rsClasses.Insert1(Record)
+				'generate & run command to insert record
+				rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
+				rsClasses.FromJSON
+			Next
 		Case "E"
 			'read record id
 			Dim RecID As String = Record.Get("classid")
@@ -1477,6 +1721,7 @@ Sub SelectAll_Events
 	Dim rsEvents As BANanoMySQLE
 	'initialize table for table creation
 	rsEvents.Initialize("bananocvc", "events", "eventid", "eventid")
+	rsEvents.SchemaAddInt(Array("componentid"))
 	Dim aw As Map = CreateMap()
 	aw.put("componentid", scomponentid)
 	rsEvents.SelectWhere("events", Array("*"), aw, Array("="), Array("eventname"))
@@ -1589,10 +1834,12 @@ Sub CreateDialog_Events
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgEvents.Container" is being built!
 
-	Dim txteventname As VMTextField = vm.NewTextField(Me, False, "txteventname", "eventname", "Event Name", "", True, "", 0, "", "The event name is required!", 0)
+	Dim txteventname As VMTextField = vm.NewTextField(Me, False, "txteventname", "eventname", "Event Name(s) - separate by comma for multiple", "", True, "", 0, "", "The event name is required!", 0)
 	txteventname.SetFieldType("string")
 	txteventname.SetAutoFocus(True)
 	txteventname.SetVisible(True)
+	txteventname.SetHideDetails(True)
+	txteventname.SetTextArea
 	dlgEvents.Container.AddControl(txteventname.textfield, txteventname.tostring, 2, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
@@ -1601,6 +1848,7 @@ Sub CreateDialog_Events
 	Dim txteventarguments As VMTextField = vm.NewTextField(Me, False, "txteventarguments", "eventarguments", "Arguments", "", False, "", 255, "", "", 0)
 	txteventarguments.SetFieldType("string")
 	txteventarguments.SetVisible(True)
+	txteventarguments.SetHideDetails(True)
 	dlgEvents.Container.AddControl(txteventarguments.textfield, txteventarguments.tostring, 3, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
@@ -1609,6 +1857,7 @@ Sub CreateDialog_Events
 	Dim swteventactive As VMCheckBox = vm.NewSwitch(Me, False, "swteventactive", "eventactive", "Active", "Yes", "No", False, 0)
 	swteventactive.SetFieldType("string")
 	swteventactive.SetVisible(True)
+	swteventactive.SetHideDetails(True)
 	dlgEvents.Container.AddControl(swteventactive.CheckBox, swteventactive.tostring, 4, 1, 0, 0, 0, 0, 12, 6, 6, 6)
 
 	vm.AddDialog(dlgEvents)
@@ -1632,15 +1881,21 @@ Sub btnOkEvents_click(e As BANanoEvent)
 	'check mode
 	Select Case Mode
 		Case "A"
-			'initialize table for insert
-			rsEvents.Initialize("bananocvc", "events", "eventid", "eventid")
-			'define schema for record
-			rsEvents.SchemaFromDesign(dlgEvents.Container)
-			'insert a record
-			rsEvents.Insert1(Record)
-			'generate & run command to insert record
-			rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)
-			rsEvents.FromJSON
+			Dim seventname As String = Record.get("eventname")
+			Dim speventname As List = BANanoShared.StrParse(",", seventname)
+			For Each seventname As String In speventname
+				'for each attribute
+				Record.put("eventname", seventname)
+				'initialize table for insert
+				rsEvents.Initialize("bananocvc", "events", "eventid", "eventid")
+				'define schema for record
+				rsEvents.SchemaFromDesign(dlgEvents.Container)
+				'insert a record
+				rsEvents.Insert1(Record)
+				'generate & run command to insert record
+				rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)
+				rsEvents.FromJSON
+			Next
 		Case "E"
 			'read record id
 			Dim RecID As String = Record.Get("eventid")
