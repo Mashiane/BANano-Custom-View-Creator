@@ -189,6 +189,8 @@ Sub UploadBVAttributes(fc As String)
 			sdescription = CleanDescription(sdescription)
 			Dim stag As String = attrm.get("tag")
 			Dim stype As String = attrm.get("type")
+			stag = CleanDescription(stag)
+			If stag = "" Then Continue
 			stype = BANanoShared.BeautifyName(stype)
 			'
 			Dim na As Map = CreateMap()
@@ -891,6 +893,9 @@ End Sub
 
 'clean the attribute type
 Sub CleanType(cType As String) As String
+	If BANano.IsUndefined(cType) Or BANano.IsNull(cType) Then
+		cType = "string"
+	End If
 	cType = cType.replace("[","")
 	cType = cType.replace("}","")
 	cType = cType.replace("{","")
@@ -905,20 +910,24 @@ Sub CleanType(cType As String) As String
 	cType = cType.replace("object", "string")
 	cType = cType.replace("number", "string")
 	cType = cType.replace("any", "string")
-	cType = cType.replace("dataoptions", "Object")
-	cType = cType.replace("tableheader", "Object")
+	cType = cType.replace("dataoptions", "object")
+	cType = cType.replace("tableheader", "object")
 	cType = vue.MvDistinct("|", cType)
 	cType = cType.replace("array|string", "string")
 	cType = cType.replace("boolean|array", "boolean")
 	cType = cType.replace("boolean|string", "string")
 	cType = cType.replace("string|array", "string")
 	cType = cType.replace("string|boolean","string")
-	cType = cType.replace("array", "List")
+	cType = cType.replace("array", "string")
 	If cType = "" Then cType = "string"
 	Return cType	
 End Sub
 
 Sub CleanArgument(etype As String) As String
+	If BANano.IsUndefined(etype) Or BANano.IsNull(etype) Then 
+		etype = ""
+		Return etype
+	End If
 	etype = etype.tolowercase
 	If etype.Startswith("boolean") Then etype = "Boolean"
 	If etype.EndsWith("event") Then etype = "BANanoEvent"
@@ -934,6 +943,10 @@ Sub CleanArgument(etype As String) As String
 End Sub
 
 Sub CleanDescription(sdesc As String) As String
+	If BANano.IsUndefined(sdesc) Or BANano.IsNull(sdesc) Then 
+		sdesc = ""
+		Return sdesc
+	End If
 	sdesc = sdesc.replace(QUOTE,"")
 	sdesc = sdesc.replace("null", "")
 	sdesc = sdesc.replace("undefined", "")

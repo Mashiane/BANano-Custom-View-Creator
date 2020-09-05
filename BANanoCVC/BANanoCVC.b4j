@@ -27,7 +27,7 @@ Library3=banano
 Library4=bananovuetifycore
 Library5=bananovuetifyconnect
 Library6=bananovuetifyprism
-Library7=bananophplib
+Library7=bananophp
 Module1=clsBuilder
 Module2=pgComponent
 Module3=pgComponents
@@ -40,7 +40,7 @@ Version=8.5
 @EndOfDesignText@
 #Region Project Attributes 
 	#MergeLibraries: True
-	#LibraryAuthor: Anele Mashy Mbanga
+	#LibraryAuthor: Anele Mbanga (TheMash)
 #End Region
 
 #IgnoreWarnings:12, 15
@@ -50,7 +50,7 @@ Sub Process_Globals
 	Public AppTitle As String = "BANano Custom View Creator"
 	Private Publish As String = "C:\laragon\www"
 	Public ServerIP As String = "localhost"
-	Public Version As String = "1.00"
+	Public Version As String = "1.6"
 	Public Port As String = "8080"
 End Sub
 

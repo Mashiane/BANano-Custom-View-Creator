@@ -563,12 +563,20 @@ Sub CreateContainer_tabCode As VMContainer
 	conttabCode.AddControl(b4xCode.PrismComponent, b4xCode.tostring, 1, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 	Return conttabCode
 End Sub
+'
+'Sub b4xCodecopy_click(e As BANanoEvent)
+'	'get the component to process
+'	Dim sb4xCode As String = vue.getdata("b4xCode")
+'	Dim sfilename As String = vue.getdata("filename")
+'	vm.SaveText2File(sb4xCode, $"${sfilename}.bas"$)
+'End Sub
 
 Sub b4xCodecopy_click(e As BANanoEvent)
-	'get the component to process
-	Dim sb4xCode As String = vue.getdata("b4xCode")
-	Dim sfilename As String = vue.getdata("filename")
-	vm.SaveText2File(sb4xCode, $"${sfilename}.bas"$)
+	vue.CopyCode2Clipboard("b4xcode")
+End Sub
+
+Sub b4xcodedownload_click(e As BANanoEvent)
+	vue.DownloadCode("b4xcode", "b4xcode.txt")
 End Sub
 
 

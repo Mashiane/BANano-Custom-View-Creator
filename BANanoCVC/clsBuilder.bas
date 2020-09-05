@@ -66,6 +66,8 @@ Sub CreateCustomView As String
 	AddCode(CV, "Version=7")
 	AddCode(CV, "@EndOfDesignText@")
 	AddCode(CV, $"#IgnoreWarnings:12"$)
+	AddComment(CV, $"Created with BANano Custom View Creator ${Main.version} by TheMash"$)
+	AddComment(CV, $"https://github.com/Mashiane/BANano-Custom-View-Creator"$)
 	AddComment(CV, "Custom BANano View class")
 	AddNewLine(CV)
 	'add the events
@@ -74,6 +76,7 @@ Sub CreateCustomView As String
 		Dim eventarguments As String = event.Get("eventarguments")
 		Dim eventactive As String = event.get("eventactive")
 		If eventactive = "No" Then Continue
+		If eventname = "undefined" Then Continue
 		'
 		'add code to handle the event
 		If projectvue = "Yes" Then
@@ -133,6 +136,12 @@ Sub CreateCustomView As String
 	AddCode(DP, $"#DesignerProperty: Key: Style, DisplayName: Style, FieldType: String, DefaultValue: , Description: Styles added to the HTML tag. Must be a json String."$)
 	AddCode(DP, $"#DesignerProperty: Key: Attributes, DisplayName: Attributes, FieldType: String, DefaultValue: , Description: Attributes added to the HTML tag. Must be a json String."$)
 	
+	If projectvue = "Yes" Then
+		AddCode(DP, $"#DesignerProperty: Key: States, DisplayName: States, FieldType: String, DefaultValue: , Description: Initial Binding States. Must be a json String."$)
+	End If
+	
+	Dim bLoremIpsum As Boolean = False
+	
 	For Each attr As Map In attributes
 		Dim attrdescription As String = attr.get("attrdescription")
 		Dim attrdesigner As String = attr.get("attrdesigner")
@@ -146,6 +155,8 @@ Sub CreateCustomView As String
 		Dim attronsub As String = attr.get("attronsub")
 		Dim attrtype As String = attr.get("attrtype")
 		Dim defaultvalue As String = attr.Get("defaultvalue")
+		If attrname = "undefined" Then Continue
+		If attrname.EqualsIgnoreCase("loremipsum") Then bLoremIpsum = True
 		'
 		attrtype = BANanoShared.BeautifyName(attrtype) 
 		If attrtype = "Boolean" And defaultvalue = "" Then
@@ -227,6 +238,7 @@ Sub CreateCustomView As String
 		Dim styleonsub As String = style.get("styleonsub")
 		Dim styletype As String = style.get("styletype")
 		Dim defaultvalue As String = style.Get("defaultvalue")
+		If stylename = "undefined" Then Continue
 		'
 		styletype = BANanoShared.BeautifyName(styletype)
 		If styletype = "Boolean" And defaultvalue = "" Then
@@ -301,6 +313,7 @@ Sub CreateCustomView As String
 		Dim classtype As String = class.get("classtype")
 		Dim defaultvalue As String = class.Get("defaultvalue")
 		Dim classaddoncondition As String = class.get("classaddoncondition")
+		If classname = "undefined" Then Continue
 		'
 		classtype = BANanoShared.BeautifyName(classtype)
 		If classtype = "Boolean" And defaultvalue = "" Then
@@ -398,9 +411,12 @@ Sub CreateCustomView As String
 	AddCode(CV, $"Private attributeList As Map"$)
 	AddCode(CV, $"Private mTagName As String = "${tagName}""$)
 	AddCode(CV, "Private sbText As StringBuilder")
-	'this is a vue project
 	If projectvue = "Yes" Then
-		AddCode(CV, $"Public bindings As Map"$)
+		AddCode(CV, "Private mStates As String")
+	End If
+	'this is a vue project
+	AddCode(CV, $"Public bindings As Map"$)
+	If projectvue = "Yes" Then
 		AddCode(CV, $"Public methods As Map"$)
 	End If
 	CV.append(VD.tostring)
@@ -433,6 +449,11 @@ Sub CreateCustomView As String
 	AddCode(CV, $"mAttributes = Props.Get("Attributes")"$)
 	AddCode(CV, $"mStyle = Props.Get("Style")"$)
 	AddCode(CV, $"mCaption = Props.Get("Caption")"$)
+	'
+	If projectvue = "Yes" Then
+		AddCode(CV, $"mStates = Props.Get("States")"$)
+	End If
+	'
 	CV.append(RD.tostring)
 	AddCode(CV, "End If")
 	AddNewLine(CV)
@@ -440,14 +461,27 @@ Sub CreateCustomView As String
 	AddCode(CV, $"AddClass(mClasses)"$)
 	AddCode(CV, $"setAttributes(mAttributes)"$)
 	AddCode(CV, $"setStyles(mStyle)"$)
+	'
+	If projectvue = "Yes" Then
+		AddCode(CV, $"SetStates(mStates)"$)
+	End If
 	
 	AddNewLine(CV)
 	
+	If projectvue = "Yes" Then
+		AddComment(CV, "link the events, if any")
+		AddCode(CV, EC.ToString)
+	End If
+	If bLoremIpsum Then	
+		AddCode(CV, "If boLoremipsum Then setCaption(BANanoShared.LoremIpsum(1))")
+	End If
 	AddComment(CV, "build and get the element")
 	AddCode(CV, $"Dim strHTML As String = ToString"$)
 	AddCode(CV, $"mElement = mTarget.Append(strHTML).Get("#" & mName)"$)
-	AddComment(CV, "add events for the custom view, if any")
-	AddCode(CV, EC.ToString)
+	If projectvue = "No" Then
+		AddComment(CV, "add events for the custom view, if any")
+	 	AddCode(CV, EC.ToString)
+	End If
 	AddCode(CV, "End Sub")
 	AddNewLine(CV)
 	
@@ -461,6 +495,7 @@ Sub CreateCustomView As String
 	AddCode(CV, $"AddAttr("style", styleName)"$)
 	AddComment(CV, "build element internal structure")
 	AddCode(CV, $"Dim iStructure As String = BANanoShared.BuildAttributes(attributeList)"$)
+	AddCode(CV, "iStructure = iStructure.trim")
 	Dim cvCode As String = $"Dim rslt As String = ~"<~{mTagName} id="~{mName}" ~{iStructure}>~{mCaption}~{sbText.ToString}</~{mTagName}>"~"$
 	cvCode = cvCode.replace("~", "$")
 	AddCode(CV, cvCode)
@@ -481,11 +516,13 @@ Sub CreateCustomView As String
 		AddCode(CV, "End Sub")
 		AddNewLine(CV)
 		'
-		AddComment(CV, "add component to app, this binds events and states")
+		AddComment(CV, "add html of component to app and this binds events and states")
 		AddCode(CV, "Sub AddToApp(vap As VueApp)")
+		AddCode(CV, "'Dim sout As String = ToString")
+		AddCode(CV, "'vap.AddHTML(sout)")
 		AddComment(CV, "apply the binding for the control")
 		AddCode(CV, "For Each k As String In bindings.Keys")
-		AddCode(CV, "Dim v As String = bindings.Get(k)")
+		AddCode(CV, "Dim v As Object = bindings.Get(k)")
 		AddCode(CV, "vap.SetData(k, v)")
 		AddCode(CV, "Next")
 		AddComment(CV, "apply the events")
@@ -496,11 +533,29 @@ Sub CreateCustomView As String
 		AddCode(CV, "End Sub")
 		AddNewLine(CV)
 		'
-		AddComment(CV, "add component to another, this binds events and states")
-		AddCode(CV, "Sub AddToComponent(ve As VueComponent)")
+		AddComment(CV, "bind component to app")
+		AddCode(CV, "Sub BindToApp(vap As VueApp)")
 		AddComment(CV, "apply the binding for the control")
 		AddCode(CV, "For Each k As String In bindings.Keys")
-		AddCode(CV, "Dim v As String = bindings.Get(k)")
+		AddCode(CV, "Dim v As Object = bindings.Get(k)")
+		AddCode(CV, "vap.SetData(k, v)")
+		AddCode(CV, "Next")
+		AddComment(CV, "apply the events")
+		AddCode(CV, "For Each k As String In methods.Keys")
+		AddCode(CV, "Dim cb As BANanoObject = methods.Get(k)")
+		AddCode(CV, "vap.SetCallBack(k, cb)")
+		AddCode(CV, "Next")
+		AddCode(CV, "End Sub")
+		AddNewLine(CV)
+		
+		'
+		AddComment(CV, "add html of component to another and binds events and states")
+		AddCode(CV, "Sub AddToComponent(ve As VueComponent)")
+		AddCode(CV, "'Dim sout As String = ToString")
+		AddCode(CV, "'ve.AddHTML(sout)")
+		AddComment(CV, "apply the binding for the control")
+		AddCode(CV, "For Each k As String In bindings.Keys")
+		AddCode(CV, "Dim v As Object = bindings.Get(k)")
 		AddCode(CV, "ve.SetData(k, v)")
 		AddCode(CV, "Next")
 		AddComment(CV, "apply the events")
@@ -508,6 +563,83 @@ Sub CreateCustomView As String
 		AddCode(CV, "Dim cb As BANanoObject = methods.Get(k)")
 		AddCode(CV, "ve.SetCallBack(k, cb)")
 		AddCode(CV, "Next")
+		AddCode(CV, "End Sub")
+		AddNewLine(CV)
+		'
+		AddComment(CV, "binds events and states")
+		AddCode(CV, "Sub BindToComponent(ve As VueComponent)")
+		AddComment(CV, "apply the binding for the control")
+		AddCode(CV, "For Each k As String In bindings.Keys")
+		AddCode(CV, "Dim v As Object = bindings.Get(k)")
+		AddCode(CV, "ve.SetData(k, v)")
+		AddCode(CV, "Next")
+		AddComment(CV, "apply the events")
+		AddCode(CV, "For Each k As String In methods.Keys")
+		AddCode(CV, "Dim cb As BANanoObject = methods.Get(k)")
+		AddCode(CV, "ve.SetCallBack(k, cb)")
+		AddCode(CV, "Next")
+		AddCode(CV, "End Sub")
+		AddNewLine(CV)
+		'
+		AddComment(CV, "initialize data")
+		AddCode(CV, "Sub SetData(prop as string, val as Object)")
+		AddCode(CV, "bindings.Put(prop, val)")
+		AddCode(CV, "End Sub")
+		AddNewLine(CV)
+		'
+		AddComment(CV, "sets the state bindings")
+		AddCode(CV, "public Sub SetStates(varBindings As String)")
+		AddCode(CV, $"if varBindings = "" Then Return"$)
+		AddCode(CV, $"Dim mxItems As List = BANanoShared.StrParse(";", varBindings)"$)
+		AddCode(CV, $"For Each mt As String In mxItems"$)
+		AddCode(CV, $"Dim k As String = BANanoShared.MvField(mt,1,"=")"$)
+		AddCode(CV, $"Dim v As String = BANanoShared.MvField(mt,2,"=")"$)
+		AddCode(CV, $"If v.EqualsIgnoreCase("false") Then"$)
+		AddCode(CV, $"bindings.Put(k, False)"$)
+		AddCode(CV, $"else if v.EqualsIgnoreCase("true") Then"$)
+		AddCode(CV, $"bindings.Put(k, True)"$)
+		AddCode(CV, $"Else"$)
+		AddCode(CV, $"bindings.put(k, v)"$)
+		AddCode(CV, "End If")
+		AddCode(CV, "Next")
+		AddCode(CV, "End Sub")
+		AddNewLine(CV)
+		'add element to text
+		AddComment(CV, "add an element to the text")
+		AddCode(CV, $"Sub AddElement(elID As String, tag As String, props As Map, styleProps As Map, classNames As List, loose As List, Text As String)"$)
+		AddCode(CV, $"elID = elID.tolowercase"$)
+		AddCode(CV, $"elID = elID.Replace("#","")"$)
+		AddCode(CV, $"Dim elIT As VueElement"$)
+		AddCode(CV, $"elIT.Initialize(mCallBack, elID, tag)"$)
+		AddCode(CV, $"elIT.SetText(Text)"$)
+		'
+		AddCode(CV, $"If loose <> Null Then"$)
+		AddCode(CV, $"For Each k As String In loose"$)
+		AddCode(CV, $"elIT.SetAttr(k, True)"$)
+		AddCode(CV, "Next")
+		AddCode(CV, "End If")
+		'
+		AddCode(CV, $"If props <> Null Then"$)
+		AddCode(CV, $"For Each k As String In props.Keys"$)
+		AddCode(CV, $"Dim v As String = props.Get(k)"$)
+		AddCode(CV, $"elIT.SetAttr(k, v)"$)
+		AddCode(CV, "Next")
+		AddCode(CV, "End If")
+		'
+		AddCode(CV, $"If styleProps <> Null Then"$)
+		AddCode(CV, $"For Each k As String In styleProps.Keys"$)
+		AddCode(CV, $"Dim v As String = styleProps.Get(k)"$)
+		AddCode(CV, $"elIT.SetAttr(k, v)"$)
+		AddCode(CV, "Next")
+		AddCode(CV, "End If")
+		'
+		AddCode(CV, $"If classNames <> Null Then"$)
+		AddCode(CV, $"elIT.AddClasses(classNames)"$)
+		AddCode(CV, "End If")
+		AddComment(CV, "convert to string")
+		AddCode(CV, $"Dim sElement As String = elIT.tostring"$)
+		AddCode(CV, $"sbText.Append(sElement)"$)
+		'
 		AddCode(CV, "End Sub")
 		AddNewLine(CV)
 	End If
@@ -524,44 +656,7 @@ Sub CreateCustomView As String
 	AddCode(CV, $"sbText.Append("<hr>")"$)
 	AddCode(CV, "End Sub")
 	AddNewLine(CV)
-	'add element to text
-	AddComment(CV, "add an element to the text")
-	AddCode(CV, $"Sub AddElement(elID As String, tag As String, props As Map, styleProps As Map, classNames As List, loose As List, Text As String)"$)
-	AddCode(CV, $"elID = elID.tolowercase"$)
-	AddCode(CV, $"elID = elID.Replace("#","")"$)
-	AddCode(CV, $"Dim elIT As VueElement"$)
-	AddCode(CV, $"elIT.Initialize(mCallBack, elID, tag)"$)
-	AddCode(CV, $"elIT.SetText(Text)"$)
-	'
-	AddCode(CV, $"If loose <> Null Then"$)
-	AddCode(CV, $"For Each k As String In loose"$)
-	AddCode(CV, $"elIT.SetAttr(k, True)"$)
-	AddCode(CV, "Next")
-	AddCode(CV, "End If")
-	'
-	AddCode(CV, $"If props <> Null Then"$)
-	AddCode(CV, $"For Each k As String In props.Keys"$)
-	AddCode(CV, $"Dim v As String = props.Get(k)"$)
-	AddCode(CV, $"elIT.SetAttr(k, v)"$)
-	AddCode(CV, "Next")
-	AddCode(CV, "End If")
-	'
-	AddCode(CV, $"If styleProps <> Null Then"$)
-	AddCode(CV, $"For Each k As String In styleProps.Keys"$)
-	AddCode(CV, $"Dim v As String = styleProps.Get(k)"$)
-	AddCode(CV, $"elIT.SetAttr(k, v)"$)
-	AddCode(CV, "Next")
-	AddCode(CV, "End If")
-	'
-	AddCode(CV, $"If classNames <> Null Then"$)
-	AddCode(CV, $"elIT.AddClass(classNames)"$)
-	AddCode(CV, "End If")
-	AddComment(CV, "convert to string")
-	AddCode(CV, $"Dim sElement As String = elIT.tostring"$)
-	AddCode(CV, $"sbText.Append(sElement)"$)
-	'
-	AddCode(CV, "End Sub")
-	AddNewLine(CV)
+	
 		
 	'
 	AddComment(CV, "returns the BANanoElement")
@@ -726,6 +821,8 @@ End Sub"$)
 	AddCode(CV, "Next")
 	AddCode(CV, "End Sub")
 	AddNewLine(CV)
+	
+	
 	AddComment(CV, "sets the styles from the designer")
 	AddCode(CV, "public Sub setStyles(varStyles As String)")
 	AddCode(CV, $"Dim mxItems As List = BANanoShared.StrParse(",", varStyles)"$)
