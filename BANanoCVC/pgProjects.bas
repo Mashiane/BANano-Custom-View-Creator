@@ -331,7 +331,7 @@ Sub CreateDataTable_projects
 	dtprojects.SetSearchbox(True)
 	dtprojects.AddDivider
 	dtprojects.SetAddNew("btnNewProject", "mdi-plus", "Add a new project")
-	dtprojects.SetItemsperpage("10")
+	dtprojects.SetItemsperpage("50")
 	dtprojects.SetMobilebreakpoint("600")
 	dtprojects.SetMultisort(True)
 	dtprojects.SetPage("1")

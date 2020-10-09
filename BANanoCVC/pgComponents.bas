@@ -655,13 +655,6 @@ Sub DeleteRecord_Components(RecordID As String)
 	vm.CallMethod("SelectAll_Components")
 End Sub
 
-'add global attributes, these exist for any element
-Sub AddGlobalAttributes(compID As String)
-	Dim ga As List = vm.newlist
-	ga.AddAll(Array("accesskey","contenteditable","dir","draggable","hidden","lang","spellcheck","tabindex","title","translate"))
-	
-End Sub
-
 'select all records
 Sub SelectAll_Components
 	Dim rsComponents As BANanoMySQLE
@@ -670,7 +663,7 @@ Sub SelectAll_Components
 	rsComponents.SchemaAddInt(Array("projectid"))
 	Dim cw As Map = CreateMap()
 	cw.put("projectid", sprojectid)
-	rsComponents.SelectWhere("components", Array("*"), cw, Array("="), Array("componenttag"))
+	rsComponents.SelectWhere("components", Array("*"), cw, Array("="), Array("componentdescription"))
 	rsComponents.JSON = BANano.CallInlinePHPWait(rsComponents.MethodName, rsComponents.Build)
 	rsComponents.FromJSON
 	'save records to state
@@ -880,6 +873,7 @@ Sub CreateDataTable_components
 	dtcomponents.SetPage("1")
 	dtcomponents.SetSingleselect(True)
 	dtcomponents.SetVisible(True)
+	dtcomponents.AddColumn1("componentid", "#", "text", 0, False, "start")
 	dtcomponents.AddColumn1("componentdescription", "Name", "text",0,False,"start")
 	dtcomponents.AddColumn1("componenttag", "HTML Tag", "text",0,True,"start")
 	dtcomponents.SetEdit(True)

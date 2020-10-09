@@ -50,7 +50,7 @@ Sub Process_Globals
 	Public AppTitle As String = "BANano Custom View Creator"
 	Private Publish As String = "C:\laragon\www"
 	Public ServerIP As String = "localhost"
-	Public Version As String = "1.6"
+	Public Version As String = "1.7"
 	Public Port As String = "8080"
 End Sub
 
@@ -61,12 +61,12 @@ Sub AppStart (Form1 As Form, Args() As String)
 	BANano.HTML_NAME = "index.html"
 	BANano.Header.Title = AppTitle
 	'
-	BANano.Header.AddFavicon("favicon-16x16.png", "16x16")
-	BANano.Header.AddAppleTouchIcon("apple-touch-icon.png", "180x180")
+	'BANano.Header.AddFavicon("favicon-16x16.png", "16x16")
+	'BANano.Header.AddAppleTouchIcon("apple-touch-icon.png", "180x180")
 	'BANano.Header.AddMSTileIcon("mstile-150x150.png", "144x144")
 	'BANano.Header.SetMaskIcon("safari-pinned-tab.svg")
-	BANano.Header.AddManifestIcon("android-chrome-192x192.png", "192x192")
-	BANano.Header.AddManifestIcon("android-chrome-512x512.png", "512x512")
+	'BANano.Header.AddManifestIcon("android-chrome-192x192.png", "192x192")
+	'BANano.Header.AddManifestIcon("android-chrome-512x512.png", "512x512")
 	'
 	BANano.TranspilerOptions.UseServiceWorker = False
 	BANano.transpileroptions.MergeAllCSSFiles = True
@@ -145,6 +145,9 @@ Sub BANano_Ready
 	rsAttributes.SchemaAddField("attronsub", "TEXT")
 	rsAttributes.SchemaAddField("attroninit", "TEXT")
 	rsAttributes.SchemaAddField("attrdesigner", "TEXT")
+	rsAttributes.SchemaAddField("oncondition", "TEXT")
+	rsAttributes.SchemaAddField("replicate", "INT")
+	
 	'generate & run command to create the table
 	rsAttributes.SchemaCreateTable
 	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
@@ -169,6 +172,7 @@ Sub BANano_Ready
 	rsStyles.SchemaAddField("styleonsub", "TEXT")
 	rsStyles.SchemaAddField("styleoninit", "TEXT")
 	rsStyles.SchemaAddField("styledesigner", "TEXT")
+	rsStyles.SchemaAddField("replicate", "INT")
 	'generate & run command to create the table
 	rsStyles.SchemaCreateTable
 	rsStyles.JSON = BANano.CallInlinePHPWait(rsStyles.MethodName, rsStyles.Build)
@@ -194,6 +198,7 @@ Sub BANano_Ready
 	rsClasses.SchemaAddField("classoninit", "TEXT")
 	rsClasses.SchemaAddField("classdesigner", "TEXT")
 	rsClasses.SchemaAddField("classaddoncondition", "TEXT")
+	rsClasses.SchemaAddField("replicate", "INT")
 	'generate & run command to create the table
 	rsClasses.SchemaCreateTable
 	rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
@@ -209,6 +214,7 @@ Sub BANano_Ready
 	rsEvents.SchemaAddField("eventactive", "TEXT")
 	rsEvents.SchemaAddField("projectid", "INT")
 	rsEvents.SchemaAddField("componentid", "INT")
+	rsEvents.SchemaAddField("replicate", "INT")
 	'generate & run command to create the table
 	rsEvents.SchemaCreateTable
 	rsEvents.JSON = BANano.CallInlinePHPWait(rsEvents.MethodName, rsEvents.Build)

@@ -28,6 +28,7 @@ Sub Process_Globals
 	Private dlgEvents As VMDialog
 	Private dtevents As VMDataTable
 	Private php As BANanoPHP
+	Private optBuilder As VMContainer
 End Sub
 
 Sub Code
@@ -48,7 +49,19 @@ Sub Code
 	Dim lblc As VMLabel
 	lblc.Initialize(vue, "lblComponentName").SetH3.SetText($"Component Tag: {{ componentdescription }} ({{ componentname }})"$)
 	cont.AddControl(lblc.label, lblc.tostring, 2, 1, 0, 0, 0, 0, 12, 12, 12, 12)
-	
+	'
+	Dim itemtypes As List = vue.newlist
+	itemtypes.add(CreateMap("id":"String","text":"String"))
+	itemtypes.add(CreateMap("id":"Int","text":"Int"))
+	itemtypes.add(CreateMap("id":"Boolean","text":"Boolean"))
+	vue.setdata("itemtypes", itemtypes)
+	'
+	Dim conditions As List = vue.newlist
+	conditions.add(CreateMap("id":"True","text":"True"))
+	conditions.add(CreateMap("id":"False","text":"False"))
+	conditions.add(CreateMap("id":"None","text":"None"))
+	vue.setdata("conditions", conditions)
+		
 	Dim tbstabs1 As VMTabs = vm.CreateTabs("tbstabs1", Me)
 	tbstabs1.SetTabSlider(True)
 	tbstabs1.SetIconsandtext(True)
@@ -223,6 +236,99 @@ Sub Show
 	b4xCode.SetCode("")
 End Sub
 
+Sub btnRefreshAttributes_click(e As BANanoEvent)
+	vm.CallMethod("SelectAll_Attributes")
+End Sub
+
+Sub btnReplicate_click(e As BANanoEvent)
+	Dim mproject As Map = vm.GetData("project")
+	Dim mcomponent As Map =	vm.GetData("component")
+	If BANano.IsNull(mproject) Or BANano.IsNull(mcomponent) Then Return
+	vm.ShowSnackBarSuccess("This process will take some time...")
+	vm.ShowLoading
+	'master project and master component
+	Dim mprojectid As String = mproject.getdefault("projectid","")
+	Dim mcomponentid As String = mcomponent.GetDefault("componentid", "")
+	'
+	'select all components for this project
+	Dim rsComp As BANanoMySQLE
+	rsComp.Initialize("bananocvc", "components", "componentid", "componentid")
+	rsComp.SchemaAddInt(Array("componentid"))
+	Dim aw As Map = CreateMap()
+	aw.put("projectid", mprojectid)
+	rsComp.SelectWhere("components", Array("componentid"), aw, Array("="), Array("componentid"))
+	rsComp.JSON = BANano.CallInlinePHPWait(rsComp.MethodName, rsComp.Build)
+	rsComp.FromJSON
+	Dim repto As List = vue.newlist
+	For Each rcomp As Map In rsComp.result
+		Dim scomponentid As String = rcomp.get("componentid")
+		If scomponentid <> mcomponentid Then repto.add(scomponentid)
+	Next
+	'delete all replicated records
+	Dim tables As List = vue.newlist
+	tables.Add(CreateMap("name":"attributes","id":"attrid"))
+	tables.Add(CreateMap("name":"classes","id":"classid"))
+	tables.Add(CreateMap("name":"styles","id":"styleid"))
+	tables.Add(CreateMap("name":"events","id":"eventid"))
+	'
+	For Each tblrec As Map In tables
+		Dim sname As String = tblrec.get("name")
+		Dim sid As String = tblrec.get("id")
+		'
+		Dim rsDelete As BANanoMySQLE
+		rsDelete.Initialize("bananocvc", sname, sid, sid)
+		rsDelete.SchemaAddInt(Array(sid, "projectid", "componentid"))
+		Dim dw As Map = CreateMap()
+		dw.put("projectid", mprojectid)
+		dw.put("replicate", 1) 
+		rsDelete.DeleteWhere(sname,dw, Array("=","="))
+		rsDelete.JSON = BANano.CallInlinePHPWait(rsDelete.MethodName, rsDelete.Build)
+		rsDelete.FromJSON
+	Next
+	'select all records for the master component
+	For Each tblrec As Map In tables
+		Dim sname As String = tblrec.get("name")
+		Dim sid As String = tblrec.get("id")
+		'
+		Dim rsAll As BANanoMySQLE
+		rsAll.Initialize("bananocvc", sname, sid, sid)
+		rsAll.SchemaAddInt(Array(sid, "projectid", "componentid"))
+		Dim sw As Map = CreateMap()
+		sw.put("componentid", mcomponentid)
+		rsAll.SelectWhere(sname, Array("*"), sw, Array("="), Array(sid))
+		rsAll.JSON = BANano.CallInlinePHPWait(rsAll.MethodName, rsAll.Build)
+		rsAll.FromJSON
+		Dim result As List = rsAll.Result
+		Dim recTot As Int = result.size
+		If recTot = 0 Then Continue
+		'
+		For Each rec As Map In result
+			'remove the key
+			rec.remove(sid)
+			'mark as replicated
+			rec.put("replicate", 1)
+			'for each of the tables
+			For Each stbl As String In repto
+				rec.put("componentid", stbl)
+				Dim rsAdd As BANanoMySQLE
+				rsAdd.Initialize("bananocvc", sname, sid, sid)
+				rsAdd.SchemaAddInt(Array(sid, "projectid", "componentid", "replicate"))
+				rsAdd.Insert1(rec)
+				rsAdd.JSON = BANano.CallInlinePHPWait(rsAdd.MethodName, rsAdd.Build)
+				rsAdd.FromJSON
+			Next
+		Next
+		vm.ShowSnackBarSuccess(sname & " have been processed!")
+	Next
+	'
+	scomponentid = mcomponentid
+	vm.CallMethod("SelectAll_Attributes")
+	vm.CallMethod("SelectAll_Classes")
+	vm.CallMethod("SelectAll_Styles")
+	vm.CallMethod("SelectAll_Events")
+	vm.HideLoading
+End Sub
+
 'Create the Attributes tab
 Sub CreateContainer_tabAttributes As VMContainer
 	Dim conttabAttributes As VMContainer
@@ -232,7 +338,13 @@ Sub CreateContainer_tabAttributes As VMContainer
 	dtattributes.SetTitle("Attributes")
 	dtattributes.SetSearchbox(True)
 	dtattributes.AddDivider
+	dtattributes.CardTitle.AddFab("btnRefreshAttributes", "mdi-reload", "magenta", "",  "Reload attributes","")
+	dtattributes.AddDivider
+	dtattributes.CardTitle.AddFab("btnReplicate", "mdi-content-duplicate", "cyan", "",  "Do everything on others","")
+	dtattributes.AddDivider
 	dtattributes.CardTitle.AddFab("btnGlobalAttributes", "playlist_add", "purple", "",  "Add global attributes","")
+	dtattributes.AddDivider
+	dtattributes.CardTitle.AddFab("btnGlobalAttributesR", "mdi-delete-circle-outline", "red", "",  "Remove global attributes","")
 	dtattributes.AddDivider
 	dtattributes.CardTitle.AddFab("btnVuejs", "mdi-vuejs", "blue", "", "Add VueJS attributes", "")
 	dtattributes.AddDivider
@@ -246,19 +358,63 @@ Sub CreateContainer_tabAttributes As VMContainer
 	dtattributes.AddColumn1("attrname", "Attribute", "text",0,False,"start")
 	dtattributes.AddColumn1("defaultvalue", "Default", "text",0,False,"start")
 	dtattributes.AddColumn1("attrtype", "Type", "text",0,False,"start")
-	dtattributes.AddColumn1("attrdesigner", "Designer Property", "text",0,False,"start")
+	dtattributes.AddColumn1("attrdesigner", "Designer", "text",0,False,"start")
 	dtattributes.AddColumn1("attrhasset", "Set", "text",0,False,"start")
 	dtattributes.AddColumn1("attrhasget", "Get", "text",0,False,"start")
-	dtattributes.AddColumn1("attrexplode", "Easy", "text",0,False,"start")
-	dtattributes.AddColumn1("attronsub", "OnSub", "text",0,False,"start")
-	dtattributes.AddColumn1("attroninit", "OnSignature", "text",0,False,"start")
+	dtattributes.AddColumn1("attroptions", "Options", "text",0,False,"start")
+	dtattributes.AddColumn1("oncondition", "On Condition", "text",0,False,"start")
+	dtattributes.SetColumnsSwitch(Array("attrdesigner","attrhasset","attrhasget"))
+	'
+	dtattributes.AddEditDialog("attrname", False)
+	dtattributes.AddEditDialog("defaultvalue", False)
+	dtattributes.AddEditDialogCombo("attrtype",False, "itemtypes", "id", "text", False)
+	dtattributes.AddEditDialogCombo("oncondition",False, "conditions", "id", "text", False)
+	dtattributes.AddEditDialogTextArea("attroptions", True)
+	
+	dtattributes.AddSave("save", "Save")
 	dtattributes.SetEdit(True)
 	dtattributes.SetDelete(True)
 	dtattributes.SetIconDimensions1("edit", "24px", "success", "80")
 	dtattributes.SetIconDimensions1("delete", "24px", "error", "80")
+	dtattributes.SetIconDimensions1("save", "24px", "cyan","80")
+	
+	dtattributes.AddSaveCancelOpenClose
 	conttabAttributes.AddControl(dtattributes.DataTable, dtattributes.tostring, 1, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 	Return conttabAttributes
 End Sub
+
+Sub savethisattribute(item As Map)
+	vm.ShowLoading
+	Dim sattrid  As String = item.get("attrid")
+	Dim rsAttributes As BANanoMySQLE
+	rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+	rsAttributes.SchemaAddInt(Array("attrid", "projectid", "componentid"))
+	rsAttributes.Update1(item, sattrid)
+	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+	rsAttributes.FromJSON
+	vm.HideLoading
+End Sub
+
+Sub dtattributes_save(item As Map)
+	savethisattribute(item)
+End Sub
+
+Sub dtattributes_change(item As Map)
+	savethisattribute(item)
+End Sub
+
+Sub dtattributes_saveitem(item As Map)
+End Sub
+
+Sub dtattributes_cancelitem(item As Map)
+End Sub
+
+Sub dtattributes_openitem
+End Sub
+
+Sub dtattributes_closeitem
+End Sub
+
 
 'add vuejs attributes
 Sub btnVuejs_click(e As BANanoEvent)
@@ -338,6 +494,41 @@ Sub btnVuejs_click(e As BANanoEvent)
 	vm.HideLoading
 End Sub
 
+Sub btnGlobalAttributesR_click(e As BANanoEvent)
+	Dim mproject As Map = vm.GetData("project")
+	Dim mcomponent As Map =	vm.GetData("component")
+	If BANano.IsNull(mproject) Or BANano.IsNull(mcomponent) Then Return
+	vm.ShowLoading
+	'
+	Dim cprojectid As String = mproject.getdefault("projectid","")
+	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
+	'
+	'add margins and padding
+	'select all attributes for this component, we will search through them
+	Dim rsAttributes As BANanoMySQLE
+	'initialize table for table creation
+	rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
+	'
+	'define the styles to add
+	Dim styles2add As List = vm.NewList
+	styles2add.addall(Array("accesskey", "contenteditable", "contextmenu", "dir", _
+	"draggable", "dropzone", "lang", "spellcheck", "tabindex", "title", "hidden", "href"))
+	'
+	For Each attrName As String In styles2add
+		Dim dw As Map = CreateMap()
+		dw.put("componentid", ccomponentid)
+		dw.put("projectid", cprojectid)
+		dw.put("attrname", attrName)
+		'
+		rsAttributes.DeleteWhere("attributes", dw, Array("=", "=", "="))
+		rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+		rsAttributes.FromJSON
+	Next
+	'reload styles
+	vm.CallMethod("SelectAll_Attributes")
+	vm.HideLoading
+End Sub
+
 Sub btnGlobalAttributes_click(e As BANanoEvent)
 	Dim mproject As Map = vm.GetData("project")
 	Dim mcomponent As Map =	vm.GetData("component")
@@ -353,7 +544,8 @@ Sub btnGlobalAttributes_click(e As BANanoEvent)
 	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
 	Dim ccomponenttag As String = mcomponent.getdefault("componenttag", "")
 	'
-	'add margins and padding
+	
+	
 	'select all attributes for this component, we will search through them
 	Dim rsAttributes As BANanoMySQLE
 	'initialize table for table creation
@@ -366,11 +558,11 @@ Sub btnGlobalAttributes_click(e As BANanoEvent)
 	rsAttributes.FromJSON
 	'
 	Dim mstylename As Map = CreateMap()
-	'
 	For Each sr As Map In rsAttributes.Result
 		Dim sstylename As String = sr.get("attrname")
 		mstylename.put(sstylename, sstylename)
 	Next
+		
 	'define the styles to add
 	Dim styles2add As List = vm.NewList
 	styles2add.addall(Array("accesskey", "contenteditable", "contextmenu", "dir", _
@@ -398,12 +590,11 @@ Sub btnGlobalAttributes_click(e As BANanoEvent)
 		ns.put("attrexplode", "No")
 		'
 		If styleName = "contenteditable" Then ns.put("attrtype", "Boolean")
-		If styleName = "dir" Then ns.put("attroptions", "ltr|rtl")
-		If styleName = "draggable" Then ns.put("attroptions", "true|false|auto")
-		If styleName = "dropzone" Then ns.put("attroptions", "copy|move|link")
+		If styleName = "dir" Then ns.put("attroptions", "none|ltr|rtl")
+		If styleName = "draggable" Then ns.put("attroptions", "none|true|false|auto")
+		If styleName = "dropzone" Then ns.put("attroptions", "none|copy|move|link")
 		If styleName = "hidden" Then ns.put("attrtype", "Boolean")
 		If styleName = "spellcheck" Then ns.put("attrtype", "Boolean")
-		
 		
 		'add to the database
 		rsAttributes.Initialize("bananocvc", "attributes", "attrid", "attrid")
@@ -411,11 +602,14 @@ Sub btnGlobalAttributes_click(e As BANanoEvent)
 		rsAttributes.Insert1(ns)
 		rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
 		rsAttributes.FromJSON
-		'
 	Next
 	'reload styles
 	vm.CallMethod("SelectAll_Attributes")
 	vm.HideLoading
+End Sub
+
+Sub btnRefreshStyles_click(e As BANanoEvent)
+	vm.CallMethod("SelectAll_Styles")
 End Sub
 
 'Create the Styles tab
@@ -427,7 +621,11 @@ Sub CreateContainer_tabStyles As VMContainer
 	dtstyles.SetTitle("Styles")
 	dtstyles.SetSearchbox(True)
 	dtstyles.AddDivider
-	dtstyles.CardTitle.AddFab("btnAddMarginsPadding", "playlist_add", "cyan", "",  "Add margins and padding","")
+	dtstyles.CardTitle.AddFab("btnRefreshStyles", "mdi-reload", "magenta", "",  "Reload styles","")
+	dtstyles.AddDivider
+	dtstyles.CardTitle.AddFab("btnAddMarginsPadding", "playlist_add", "cyan", "",  "Add global styles","")
+	dtstyles.AddDivider
+	dtstyles.CardTitle.AddFab("btnAddMarginsPaddingR", "mdi-delete-circle-outline", "red", "",  "Remove global styles","")
 	dtstyles.AddDivider
 	dtstyles.SetAddNew("btnNewStyle", "mdi-plus", "Add a new style")
 	dtstyles.SetItemsperpage("1000")
@@ -439,20 +637,96 @@ Sub CreateContainer_tabStyles As VMContainer
 	dtstyles.AddColumn1("stylename", "Style", "text",0,True,"start")
 	dtstyles.AddColumn1("defaultvalue", "Default", "text",0,False,"start")
 	dtstyles.AddColumn1("styletype", "Type", "text",0,True,"start")
-	dtstyles.AddColumn1("styledesigner", "Designer Property", "text",0,False,"start")
+	dtstyles.AddColumn1("styledesigner", "Designer", "text",0,False,"start")
 	dtstyles.AddColumn1("stylehasset", "Set", "text",0,False,"start")
 	dtstyles.AddColumn1("stylehasget", "Get", "text",0,False,"start")
-	dtstyles.AddColumn1("styleexplode", "Easy", "text",0,False,"start")
-	dtstyles.AddColumn1("styleonsub", "OnSub", "text",0,False,"start")
-	dtstyles.AddColumn1("styleoninit", "OnSignature", "text",0,False,"start")
+	dtstyles.AddColumn1("styleoptions", "Options", "text",0,False,"start")
+	dtstyles.SetColumnsSwitch(Array("styledesigner","stylehasset","stylehasget"))
+	'
+	dtstyles.AddEditDialog("stylename", False)
+	dtstyles.AddEditDialog("defaultvalue", False)
+	dtstyles.AddEditDialogTextArea("styleoptions", True)
+	
+	dtstyles.AddSave("save", "Save")
 	dtstyles.SetEdit(True)
 	dtstyles.SetDelete(True)
 	dtstyles.SetClone(True) 
 	dtstyles.SetIconDimensions1("edit", "24px", "success","80")
 	dtstyles.SetIconDimensions1("delete", "24px", "error","80")
 	dtstyles.SetIconDimensions1("clone", "24px", "orange","80")
+	dtstyles.SetIconDimensions1("save", "24px", "cyan","80")
+	
+	dtstyles.AddSaveCancelOpenClose
 	conttabStyles.AddControl(dtstyles.DataTable, dtstyles.tostring, 1, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 	Return conttabStyles
+End Sub
+
+Sub savethisstyle(item As Map)
+	vm.ShowLoading
+	Dim sattrid  As String = item.get("styleid")
+	Dim rsAttributes As BANanoMySQLE
+	rsAttributes.Initialize("bananocvc", "styles", "styleid", "styleid")
+	rsAttributes.SchemaAddInt(Array("styleid", "projectid", "componentid"))
+	rsAttributes.Update1(item, sattrid)
+	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+	rsAttributes.FromJSON
+	vm.HideLoading
+End Sub
+
+Sub dtstyles_save(item As Map)
+	savethisstyle(item)
+End Sub
+
+Sub dtstyles_change(item As Map)
+	savethisstyle(item)
+End Sub
+
+Sub dtstyles_saveitem(item As Map)
+End Sub
+
+Sub dtstyles_cancelitem(item As Map)
+End Sub
+
+Sub dtstyles_openitem
+End Sub
+
+Sub dtstyles_closeitem
+End Sub
+
+
+
+Sub btnAddMarginsPaddingR_click(e As BANanoEvent)
+	Dim mproject As Map = vm.GetData("project")
+	Dim mcomponent As Map =	vm.GetData("component")
+	If BANano.IsNull(mproject) Or BANano.IsNull(mcomponent) Then Return
+	vm.ShowLoading
+	'
+	Dim cprojectid As String = mproject.getdefault("projectid","")
+	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
+	'
+	'select all styles for this component, we will search through them
+	Dim rsStyles As BANanoMySQLE
+	'initialize table for table creation
+	rsStyles.Initialize("bananocvc", "styles", "styleid", "styleid")
+	'
+	Dim styles2add As List = vm.NewList
+	styles2add.addall(Array("margin-top", "margin-bottom", "margin-left", "margin-right", _
+	"border-style", "border-color", "border-radius", "padding-top", "padding-bottom", "padding-left", "padding-right","width", "border-width", "height","margin","padding","border", "background-image", "background-repeat", _
+	"font-size", "text-align", "font-weight", "text-decoration", "font-style", "font-family", "color", "background-color","max-height","max-width","min-width","min-height"))
+	'
+	For Each stra As String In styles2add
+		Dim dw As Map = CreateMap()
+		dw.put("componentid", ccomponentid)
+		dw.put("projectid", cprojectid)
+		dw.put("stylename", stra)
+		'
+		rsStyles.DeleteWhere("styles", dw, Array("=", "=", "="))
+		rsStyles.JSON = BANano.CallInlinePHPWait(rsStyles.MethodName, rsStyles.Build)
+		rsStyles.FromJSON
+	Next
+	'reload styles
+	vm.CallMethod("SelectAll_Styles")
+	vm.HideLoading
 End Sub
 
 'add margins and padding
@@ -472,6 +746,23 @@ Sub btnAddMarginsPadding_click(e As BANanoEvent)
 	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
 	Dim ccomponenttag As String = mcomponent.getdefault("componenttag", "")
 	'
+	'check classes first
+	Dim rsClasses As BANanoMySQLE
+	'initialize table for table creation
+	rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
+	rsClasses.SchemaAddInt(Array("componentid"))
+	Dim aw As Map = CreateMap()
+	aw.put("componentid", scomponentid)
+	rsClasses.SelectWhere("classes", Array("*"), aw, Array("="), Array("classname"))
+	rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
+	rsClasses.FromJSON
+	'
+	Dim mstylename As Map = CreateMap()
+	For Each sr As Map In rsClasses.Result
+		Dim sstylename As String = sr.get("classname")
+		mstylename.put(sstylename, sstylename)
+	Next
+	
 	'add margins and padding
 	'select all styles for this component, we will search through them
 	Dim rsStyles As BANanoMySQLE
@@ -484,8 +775,6 @@ Sub btnAddMarginsPadding_click(e As BANanoEvent)
 	rsStyles.JSON = BANano.CallInlinePHPWait(rsStyles.MethodName, rsStyles.Build)
 	rsStyles.FromJSON
 	'
-	Dim mstylename As Map = CreateMap()
-	'
 	For Each sr As Map In rsStyles.Result
 		Dim sstylename As String = sr.get("stylename")
 		mstylename.put(sstylename, sstylename)
@@ -494,7 +783,7 @@ Sub btnAddMarginsPadding_click(e As BANanoEvent)
 	Dim styles2add As List = vm.NewList
 	styles2add.addall(Array("margin-top", "margin-bottom", "margin-left", "margin-right", _
 	"border-style", "border-color", "border-radius", "padding-top", "padding-bottom", "padding-left", "padding-right","width", "border-width", "height","margin","padding","border", "background-image", "background-repeat", _
-	"font-size", "text-align", "font-weight", "text-decoration", "font-style", "font-family", "color", "background-color"))
+	"font-size", "text-align", "font-weight", "text-decoration", "font-style", "font-family", "color", "background-color","max-height","max-width","min-width","min-height"))
 	'
 	'do a search for each style
 	For Each styleName As String In styles2add
@@ -517,25 +806,25 @@ Sub btnAddMarginsPadding_click(e As BANanoEvent)
 		ns.put("stylemax", "")
 		ns.put("styleexplode", "No")
 		'
-		If styleName = "text-align" Then ns.put("styleoptions", "left|center|right|justify")
-		If styleName = "font-weight" Then ns.put("styleoptions", "normal|bold|bolder|lighter|initial|inherit")
-		If styleName = "font-style" Then ns.put("styleoptions", "normal|italic|oblique|initial|inherit")
-		If styleName = "color" Then ns.put("styleoptions", "amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
-		If styleName = "background-color" Then ns.put("styleoptions", "amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
+		If styleName = "text-align" Then ns.put("styleoptions", "none|left|center|right|justify")
+		If styleName = "font-weight" Then ns.put("styleoptions", "none|normal|bold|bolder|lighter|initial|inherit")
+		If styleName = "font-style" Then ns.put("styleoptions", "none|normal|italic|oblique|initial|inherit")
+		If styleName = "color" Then ns.put("styleoptions", "none|amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
+		If styleName = "background-color" Then ns.put("styleoptions", "none|amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
 		'
 		If styleName = "border-style" Then
 			ns.put("styleoptions", "none|hidden|dotted|dashed|solid|double|groove|ridge|inset|outset|initial|inherit")
 		End If
 		If styleName = "border-color" Then
-			ns.put("styleoptions", "amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
+			ns.put("styleoptions", "none|amber|black|blue|blue-grey|brown|cyan|deep-orange|deep-purple|green|grey|indigo|light-blue|light-green|lime|orange|pink|purple|red|teal|transparent|white|yellow|primary|secondary|accent|error|info|success|warning|none")
 		End If
 		
 		If styleName = "background-repeat" Then
-			ns.put("styleoptions", "repeat|repeat-x|repeat-y|no-repeat|initial|inherit")
+			ns.put("styleoptions", "none|repeat|repeat-x|repeat-y|no-repeat|initial|inherit")
 		End If
 		'
 		If styleName = "background-repeat" Then
-			ns.put("styleoptions", "repeat|repeat-x|repeat-y|no-repeat|initial|inherit")
+			ns.put("styleoptions", "none|repeat|repeat-x|repeat-y|no-repeat|initial|inherit")
 		End If
 		
 		'add to the database
@@ -579,6 +868,9 @@ Sub b4xcodedownload_click(e As BANanoEvent)
 	vue.DownloadCode("b4xcode", "b4xcode.txt")
 End Sub
 
+Sub btnRefreshClasses_click(e As BANanoEvent)
+	vue.callmethod("SelectAll_Classes")
+End Sub
 
 'Create the Classes tab
 Sub CreateContainer_tabClasses As VMContainer
@@ -588,6 +880,8 @@ Sub CreateContainer_tabClasses As VMContainer
 	dtclasses = vm.CreateDataTable("dtclasses", "classid", Me)
 	dtclasses.SetTitle("Classes")
 	dtclasses.SetSearchbox(True)
+	dtclasses.AddDivider
+	dtclasses.CardTitle.AddFab("btnRefreshClasses", "mdi-reload", "magenta", "",  "Reload classes","")
 	dtclasses.Adddivider
 	dtclasses.SetAddNew("btnNewClasse", "mdi-plus", "Add a new classe")
 	dtclasses.SetItemsperpage("100")
@@ -599,22 +893,166 @@ Sub CreateContainer_tabClasses As VMContainer
 	dtclasses.AddColumn1("classname", "Class", "text",0,True,"start")
 	dtclasses.AddColumn1("defaultvalue", "Default", "text",0,False,"start")
 	dtclasses.AddColumn1("classtype", "Type", "text",0,False,"start")
-	dtclasses.AddColumn1("classdesigner", "Designer Property", "text",0,False,"start")
-	dtclasses.AddColumn1("classaddoncondition", "On Condition", "text",0,False,"start")
+	dtclasses.AddColumn1("classdesigner", "Designer", "text",0,False,"start")
 	dtclasses.AddColumn1("classhasset", "Set", "text",0,False,"start")
 	dtclasses.AddColumn1("classhasget", "Get", "text",0,False,"start")
-	dtclasses.AddColumn1("classonsub", "OnSub", "text",0,False,"start")
-	dtclasses.AddColumn1("classoninit", "OnSignature", "text",0,False,"start")
+	dtclasses.AddColumn1("classoptions", "Options", "text",0,False,"start")
+	dtclasses.AddColumn1("classaddoncondition", "On Condition", "text",0,False,"start")
+	dtclasses.SetColumnsSwitch(Array("classdesigner","classhasset","classhasget"))
+	'
+	dtclasses.AddEditDialog("classname", False)
+	dtclasses.AddEditDialog("defaultvalue", False)
+	dtclasses.AddEditDialog("classtype", False)
+	dtclasses.AddEditDialogCombo("classtype",False, "itemtypes", "id", "text", False)
+	dtclasses.AddEditDialogCombo("classaddoncondition",False, "conditions", "id", "text", False)
+	dtclasses.AddEditDialogTextArea("classoptions", True)
+	'	
+	dtclasses.AddSave("save", "Save")
 	dtclasses.SetEdit(True)
 	dtclasses.SetDelete(True)
 	dtclasses.SetClone(True)
 	dtclasses.SetIconDimensions1("edit", "24px", "success","80")
 	dtclasses.SetIconDimensions1("delete", "24px", "error","80")
 	dtclasses.SetIconDimensions1("clone", "24px", "orange","80")
+	dtclasses.SetIconDimensions1("save", "24px", "cyan","80")
+	
+	dtclasses.AddSaveCancelOpenClose
 	conttabClasses.AddControl(dtclasses.DataTable, dtclasses.tostring, 1, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 	Return conttabClasses
 End Sub
 
+Sub savethisclass(item As Map)
+	vm.ShowLoading
+	Dim sattrid  As String = item.get("classid")
+	Dim rsAttributes As BANanoMySQLE
+	rsAttributes.Initialize("bananocvc", "classes", "classid", "classid")
+	rsAttributes.SchemaAddInt(Array("classid", "projectid", "componentid"))
+	rsAttributes.Update1(item, sattrid)
+	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+	rsAttributes.FromJSON
+	vm.HideLoading
+End Sub
+
+Sub dtclasses_save(item As Map)
+	savethisclass(item)
+End Sub
+
+Sub dtclasses_change(item As Map)
+	savethisclass(item)
+End Sub
+
+Sub dtclasses_saveitem(item As Map)
+End Sub
+
+Sub dtclasses_cancelitem(item As Map)
+End Sub
+
+Sub dtclasses_openitem
+End Sub
+
+Sub dtclasses_closeitem
+End Sub
+
+
+Sub btnGlobalEvents_click(e As BANanoEvent)
+	Dim mproject As Map = vm.GetData("project")
+	Dim mcomponent As Map =	vm.GetData("component")
+	If BANano.IsNull(mproject) Or BANano.IsNull(mcomponent) Then Return
+	vm.ShowLoading
+	'
+	Dim cprojectid As String = mproject.getdefault("projectid","")
+	Dim cprojectname As String = mproject.getdefault("projectname","")
+	Dim cprojectprefix As String = mproject.getdefault("projectprefix", "")
+	Dim cprojectversion As String = mproject.getdefault("projectversion", "")
+	'
+	Dim ccomponentdescription As String = mcomponent.getdefault("componentdescription","")
+	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
+	Dim ccomponenttag As String = mcomponent.getdefault("componenttag", "")
+	'
+	'add margins and padding
+	'select all events for this component, we will search through them
+	Dim rsAttributes As BANanoMySQLE
+	'initialize table for table creation
+	rsAttributes.Initialize("bananocvc", "events", "eventid", "eventid")
+	rsAttributes.SchemaAddInt(Array("componentid"))
+	Dim aw As Map = CreateMap()
+	aw.put("componentid", scomponentid)
+	rsAttributes.SelectWhere("events", Array("*"), aw, Array("="), Array("eventname"))
+	rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+	rsAttributes.FromJSON
+	'
+	Dim mstylename As Map = CreateMap()
+	'
+	For Each sr As Map In rsAttributes.Result
+		Dim sstylename As String = sr.get("eventname")
+		mstylename.put(sstylename, sstylename)
+	Next
+	'define the styles to add
+	Dim styles2add As List = vm.NewList
+	styles2add.addall(Array("change", "click", "mouseover", "mouseout", "keydown", "load", _
+	"blur", "focus", "input", "submit", "keypress", "keyup", "dblclick", "mousedown", "mousemove", _
+	"mouseup", "drag", "dragend", "dragenter", "dragleave", "dragover", "dragstart", "drop", "unload"))
+	'
+	'do a search for each style
+	For Each styleName As String In styles2add
+		If mstylename.ContainsKey(styleName) Then Continue
+		'add the new style
+		Dim ns As Map = CreateMap()
+		ns.put("eventname", styleName)
+		ns.put("projectid", cprojectid)
+		ns.put("componentid", ccomponentid)
+		ns.put("eventarguments", "e As BANanoEvent")
+		ns.put("eventactive", "Yes")
+		'
+		'add to the database
+		rsAttributes.Initialize("bananocvc", "events", "eventid", "eventid")
+		rsAttributes.SchemaAddInt(Array("projectid","componentid"))
+		rsAttributes.Insert1(ns)
+		rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+		rsAttributes.FromJSON
+		'
+	Next
+	'reload styles
+	vm.CallMethod("SelectAll_Events")
+	vm.HideLoading
+End Sub
+
+Sub btnGlobalEventsR_click(e As BANanoEvent)
+	Dim mproject As Map = vm.GetData("project")
+	Dim mcomponent As Map =	vm.GetData("component")
+	If BANano.IsNull(mproject) Or BANano.IsNull(mcomponent) Then Return
+	vm.ShowLoading
+	'
+	Dim cprojectid As String = mproject.getdefault("projectid","")
+	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
+	'
+	'add margins and padding
+	'select all attributes for this component, we will search through them
+	Dim rsAttributes As BANanoMySQLE
+	'initialize table for table creation
+	rsAttributes.Initialize("bananocvc", "events", "eventid", "eventid")
+	'
+	'define the styles to add
+	Dim styles2add As List = vm.NewList
+	styles2add.addall(Array("change", "click", "mouseover", "mouseout", "keydown", "load", _
+	"blur", "focus", "input", "submit", "keypress", "keyup", "dblclick", "mousedown", "mousemove", _
+	"mouseup", "drag", "dragend", "dragenter", "dragleave", "dragover", "dragstart", "drop", "unload"))
+	'
+	'
+	For Each attrName As String In styles2add
+		Dim dw As Map = CreateMap()
+		dw.put("componentid", ccomponentid)
+		dw.put("projectid", cprojectid)
+		dw.put("eventname", attrName)
+		'
+		rsAttributes.DeleteWhere("events", dw, Array("=", "=", "="))
+		rsAttributes.JSON = BANano.CallInlinePHPWait(rsAttributes.MethodName, rsAttributes.Build)
+		rsAttributes.FromJSON
+	Next
+	'reload styles
+	vm.CallMethod("SelectAll_Events")
+	vm.HideLoading
+End Sub
 
 'Create the Events tab
 Sub CreateContainer_tabEvents As VMContainer
@@ -625,8 +1063,12 @@ Sub CreateContainer_tabEvents As VMContainer
 	dtevents.SetTitle("Events")
 	dtevents.SetSearchbox(True)
 	dtevents.AddDivider
+	dtevents.CardTitle.AddFab("btnGlobalEvents", "playlist_add", "orange", "",  "Add global events","")
+	dtevents.AddDivider
+	dtevents.CardTitle.AddFab("btnGlobalEventsR", "mdi-delete-circle-outline", "red", "",  "Remove global events","")
+	dtevents.AddDivider
 	dtevents.SetAddNew("btnNewEvents", "mdi-plus", "Add a new events")
-	dtevents.SetItemsperpage("10")
+	dtevents.SetItemsperpage("100")
 	dtevents.SetMobilebreakpoint("600")
 	dtevents.SetMultisort(True)
 	dtevents.SetPage("1")
@@ -823,12 +1265,21 @@ Sub CreateDialog_Attributes
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
 
-	Dim swtattrdesigner As VMCheckBox = vm.NewSwitch(Me, False, "swtattrdesigner", "attrdesigner", "Designer Property", "Yes", "No", False, 0)
+	Dim swtattrdesigner As VMCheckBox = vm.NewSwitch(Me, False, "swtattrdesigner", "attrdesigner", "Designer", "Yes", "No", False, 0)
 	swtattrdesigner.SetFieldType("string")
 	swtattrdesigner.SetVisible(True)
 	swtattrdesigner.SetHideDetails(True)
 	dlgAttributes.Container.AddControl(swtattrdesigner.CheckBox, swtattrdesigner.tostring, 4, 2, 0, 0, 0, 0, 12, 6, 6, 6)
 
+
+	Dim onconditionkeys As String = "True,False,None"
+	Dim onconditionvalues As String = "True,False,None"
+	Dim onconditionmap As Map = vm.keyvalues2map(",", onconditionkeys, onconditionvalues)
+	Dim rdoncondition As VMRadioGroup = vm.NewRadioGroup(Me, False, "rdoncondition", "oncondition", "Add on condition", "None", onconditionmap, True, False, 0)
+	rdoncondition.SetFieldType("string")
+	rdoncondition.SetVisible(True)
+	rdoncondition.SetHideDetails(True)
+	dlgAttributes.Container.AddControl(rdoncondition.RadioGroup, rdoncondition.tostring, 5, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgAttributes.Container" is being built!
 
@@ -928,6 +1379,7 @@ Sub btnOkAttributes_click(e As BANanoEvent)
 			Dim sattrname As String = Record.get("attrname")
 			Dim spattrname As List = BANanoShared.StrParse(",", sattrname)
 			For Each sattrname As String In spattrname
+				sattrname = sattrname.trim
 				'for each attribute
 				Record.put("attrname", sattrname)
 				'initialize table for insert
@@ -1190,7 +1642,7 @@ Sub CreateDialog_Styles
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgStyles.Container" is being built!
 
-	Dim swtstyledesigner As VMCheckBox = vm.NewSwitch(Me, False, "swtstyledesigner", "styledesigner", "Designer Property", "Yes", "No", False, 0)
+	Dim swtstyledesigner As VMCheckBox = vm.NewSwitch(Me, False, "swtstyledesigner", "styledesigner", "Designer", "Yes", "No", False, 0)
 	swtstyledesigner.SetFieldType("string")
 	swtstyledesigner.SetValue("Yes")
 	swtstyledesigner.SetVisible(True)
@@ -1281,6 +1733,7 @@ Sub btnOkStyles_click(e As BANanoEvent)
 			Dim sstylename As String = Record.get("stylename")
 			Dim spstylename As List = BANanoShared.StrParse(",", sstylename)
 			For Each sstylename As String In spstylename
+				sstylename = sstylename.trim
 				'for each attribute
 				Record.put("stylename", sstylename)
 				'initialize table for insert
@@ -1470,6 +1923,8 @@ Sub CreateDialog_Classes
 	txtclassname.SetAutoFocus(True)
 	txtclassname.SetVisible(True)
 	txtclassname.SetHideDetails(True)
+	Dim btnClassAfter As VMButton = vm.CreateButton("btnClassAfter", Me).SetColor(vm.COLOR_ORANGE).SetIconButton("mdi-layers-search-outline")
+	txtclassname.AddButtonAfter(btnClassAfter)
 	dlgClasses.Container.AddControl(txtclassname.textfield, txtclassname.tostring, 2, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
@@ -1497,7 +1952,7 @@ Sub CreateDialog_Classes
 
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
 
-	Dim swtclassdesigner As VMCheckBox = vm.NewSwitch(Me, False, "swtclassdesigner", "classdesigner", "Designer Property", "Yes", "No", False, 0)
+	Dim swtclassdesigner As VMCheckBox = vm.NewSwitch(Me, False, "swtclassdesigner", "classdesigner", "Designer", "Yes", "No", False, 0)
 	swtclassdesigner.SetFieldType("string")
 	swtclassdesigner.SetValue("Yes")
 	swtclassdesigner.SetDense(True)
@@ -1525,6 +1980,23 @@ Sub CreateDialog_Classes
 	dlgClasses.Container.AddControl(txtclassdescription.textfield, txtclassdescription.tostring, 6, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
+	'add options builder
+	optBuilder = vm.CreateContainer("optbuilder", Me)
+	optBuilder.SetElevation(4)
+	optBuilder.AddComponent(0,0, "Options Builder</br>") 
+	'
+	Dim optprefix As VMTextField = vm.NewTextField(Me, False, "optprefix", "optprefix", "Option Prefix", "Prefix", True, "", 0, "", "The prefix should be specified", 0)
+	Dim optvalues As VMTextField = vm.NewTextField(Me, False, "optvalues", "optvalues", "Option Values", "Values", True, "", 0, "", "The values should be specified", 0)
+	Dim btnOptions As VMButton = vm.NewButton(Me, False, "btnOptions", "Build", True, True, False, True)
+	
+	optprefix.SetHideDetails(True)
+	optvalues.SetHideDetails(True)
+	optBuilder.AddControl(optprefix.TextField, optprefix.ToString,1,1,0,0,0,0,12,3,3,3)
+	optBuilder.AddControl(optvalues.TextField, optvalues.ToString,1,2,0,0,0,0,12,7,7,7)
+	optBuilder.AddControl(btnOptions.Button, btnOptions.ToString,1,3,0,0,0,0,12,2,2,2)
+	dlgClasses.Container.AddControl(optBuilder.Container, optBuilder.tostring, 7, 1, 0, 0, 0, 0, 12, 12, 12, 12)
+
+	
 	'INSTRUCTION: Copy & paste the code below to where your "dlgClasses.Container" is being built!
 
 	Dim txtclassoptions As VMTextField = vm.NewTextField(Me, False, "txtclassoptions", "classoptions", "Options", "", False, "", 0, "", "", 0)
@@ -1533,6 +2005,7 @@ Sub CreateDialog_Classes
 	txtclassoptions.SetVisible(True)
 	txtclassoptions.SetTextArea
 	txtclassoptions.SetHideDetails(True)
+	txtclassoptions.AddClass("pt-4")
 	dlgClasses.Container.AddControl(txtclassoptions.textfield, txtclassoptions.tostring, 7, 1, 0, 0, 0, 0, 12, 12, 12, 12)
 
 
@@ -1601,6 +2074,74 @@ Sub CreateDialog_Classes
 	vm.AddDialog(dlgClasses)
 End Sub
 
+'search for the entered class
+Sub btnClassAfter_click(e As BANanoEvent)
+	Dim sclassname As String = vm.getdata("classname")
+	sclassname = sclassname.trim
+	If sclassname = "" Then Return
+	'
+	vm.SHowloading
+	Dim mproject As Map = vm.GetData("project")
+	Dim cprojectid As String = mproject.getdefault("projectid","")
+	Dim mcomponent As Map =	vm.GetData("component")
+	Dim ccomponentid As String = mcomponent.GetDefault("componentid", "")
+	
+	'
+	'resultset variable
+	Dim rsClasses As BANanoMySQLE
+	rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
+	rsClasses.SchemaAddInt(Array("projectid"))
+	rsClasses.SelectWhere("classes", Array("*"), CreateMap("projectid":cprojectid, "classname":sclassname), Array("=", "="), Array("classname"))
+	rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
+	rsClasses.FromJSON
+	If rsClasses.OK Then
+		Dim recs As List = rsClasses.result
+		If recs.Size >= 0 Then
+			Dim rec As Map = recs.get(0)
+			rec.put("componentid", ccomponentid)
+			vm.SetState(rec)
+			Mode = "A"
+			vm.hideloading
+			Return
+		End If
+	End If
+	vm.hideloading
+	vm.ShowSnackBarError("No class could be found that meets your criteria!")
+End Sub
+
+'build the options
+Sub btnOptions_click(e As BANanoEvent)
+	'get the options
+	Dim optdata As Map = optBuilder.GetData
+	
+	'validate the record
+	Dim bValid As Boolean = vm.Validate(optdata, optBuilder.Required)
+	'if invalid exit create/update
+	If bValid = False Then
+		Dim strError As String = vue.GetError
+		vm.ShowSnackBarError(strError)
+		Return
+	End If
+	'
+	Dim soptprefix As String = vue.getdata("optprefix")
+	Dim soptvalues As String = vue.getdata("optvalues")
+	soptvalues = soptvalues.replace(",", ";")
+	
+	Dim sb As StringBuilder
+	sb.initialize
+	Dim sclassoptions As String = vue.getdata("classoptions")
+	sb.append(sclassoptions)
+	
+	Dim spvalues() As String = BANano.split(";", soptvalues)
+	For Each svalue As String In spvalues
+		svalue = svalue.trim
+		sb.append(soptprefix & svalue & "|")
+	Next
+	Dim sout As String = sb.tostring
+	sout = BANanoShared.RemDelim(sout,"|")
+	vue.setdata("classoptions", sout)
+End Sub
+
 'add code to save the Classe
 Sub btnOkClasses_click(e As BANanoEvent)
 	'create/update record to table
@@ -1624,8 +2165,10 @@ Sub btnOkClasses_click(e As BANanoEvent)
 			Dim sclassname As String = Record.get("classname")
 			Dim spclassname As List = BANanoShared.StrParse(",", sclassname)
 			For Each sclassname As String In spclassname
+				sclassname = sclassname.trim
 				'for each attribute
 				Record.put("classname", sclassname)
+				Record.remove("classid")
 				'initialize table for insert
 				rsClasses.Initialize("bananocvc", "classes", "classid", "classid")
 				'define schema for record
@@ -1649,11 +2192,11 @@ Sub btnOkClasses_click(e As BANanoEvent)
 			rsClasses.JSON = BANano.CallInlinePHPWait(rsClasses.MethodName, rsClasses.Build)
 			rsClasses.FromJSON
 	End Select
-	Log(rsClasses.query)
-	Log(rsClasses.args)
-	Log(rsClasses.types)
-	Log(rsClasses.fields)
-	Log(rsClasses.error)
+	'Log(rsClasses.query)
+	'Log(rsClasses.args)
+	'Log(rsClasses.types)
+	'Log(rsClasses.fields)
+	'Log(rsClasses.error)
 	'hide the modal
 	dlgClasses.Hide
 	'execute code to refresh listing for Classes
@@ -1892,6 +2435,7 @@ Sub btnOkEvents_click(e As BANanoEvent)
 			Dim seventname As String = Record.get("eventname")
 			Dim speventname As List = BANanoShared.StrParse(",", seventname)
 			For Each seventname As String In speventname
+				seventname = seventname.trim
 				'for each attribute
 				Record.put("eventname", seventname)
 				'initialize table for insert

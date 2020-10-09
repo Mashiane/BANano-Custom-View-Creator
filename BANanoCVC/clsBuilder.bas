@@ -73,8 +73,10 @@ Sub CreateCustomView As String
 	'add the events
 	For Each event As Map In events
 		Dim eventname As String = event.get("eventname")
+		eventname = eventname.trim
 		Dim eventarguments As String = event.Get("eventarguments")
 		Dim eventactive As String = event.get("eventactive")
+		eventarguments = eventarguments.trim
 		If eventactive = "No" Then Continue
 		If eventname = "undefined" Then Continue
 		'
@@ -103,7 +105,8 @@ Sub CreateCustomView As String
 				Dim xarguments As String = GetVariablesFromArguments(eventarguments)
 				AddCode(EV, $"Dim cb As BANanoObject = BANano.CallBack(mCallBack, sName, Array(${xarguments}))"$)
 			Else
-				AddCode(EV, $"Dim cb As BANanoObject = BANano.CallBack(mCallBack, sName, Null)"$)
+				AddCode(EV, "Dim e As BANanoEvent")
+				AddCode(EV, $"Dim cb As BANanoObject = BANano.CallBack(mCallBack, sName, Array(e))"$)
 			End If
 			AddCode(EV, $"methods.Put(sName, cb)"$)
 			AddCode(EV, "End Sub")
@@ -131,7 +134,7 @@ Sub CreateCustomView As String
 	Next
 	AddNewLine(CV)
 	'
-	AddCode(DP, $"#DesignerProperty: Key: Caption, DisplayName: Caption, FieldType: String, DefaultValue: , Description: Text on the element"$)
+	AddCode(DP, $"#DesignerProperty: Key: Text, DisplayName: Text, FieldType: String, DefaultValue: , Description: Text on the element"$)
 	AddCode(DP, $"#DesignerProperty: Key: Classes, DisplayName: Classes, FieldType: String, DefaultValue: , Description: Classes added to the HTML tag."$)
 	AddCode(DP, $"#DesignerProperty: Key: Style, DisplayName: Style, FieldType: String, DefaultValue: , Description: Styles added to the HTML tag. Must be a json String."$)
 	AddCode(DP, $"#DesignerProperty: Key: Attributes, DisplayName: Attributes, FieldType: String, DefaultValue: , Description: Attributes added to the HTML tag. Must be a json String."$)
@@ -140,24 +143,155 @@ Sub CreateCustomView As String
 		AddCode(DP, $"#DesignerProperty: Key: States, DisplayName: States, FieldType: String, DefaultValue: , Description: Initial Binding States. Must be a json String."$)
 	End If
 	
-	Dim bLoremIpsum As Boolean = False
+	AddCode(DP, "'***** CLASSES *****")
+	AddNewLine(DP)
 	
+	'process classes
+	Dim prev As Map = CreateMap()
+	For Each class As Map In classes
+		Dim classdescription As String = class.get("classdescription")
+		classdescription = classdescription.trim
+		Dim classdesigner As String = class.get("classdesigner")
+		Dim classhasget As String = class.get("classhasget")
+		Dim classhasset As String = class.get("classhasset")
+		Dim classname As String = class.get("classname")
+		classname = classname.trim
+		Dim classoptions As String = class.get("classoptions")
+		classoptions = classoptions.Trim
+		classoptions = RemoveDuplicates(classoptions)
+		Dim classoninit As String = class.get("classoninit")
+		Dim classonsub As String = class.get("classonsub")
+		Dim classtype As String = class.get("classtype")
+		Dim defaultvalue As String = class.Get("defaultvalue")
+		defaultvalue = defaultvalue.trim
+		Dim classaddoncondition As String = class.get("classaddoncondition")
+		If classname = "undefined" Then Continue
+		'
+		classtype = BANanoShared.BeautifyName(classtype)
+		If classtype = "Boolean" And defaultvalue = "" Then
+			defaultvalue = "False"
+		End If
+		Dim varPrefix As String = BANanoShared.LeftString(classtype, 2)
+		varPrefix = varPrefix.tolowercase
+		
+		'
+		'beautify the class name
+		Dim cAttrName As String = vm.BeautifyName(classname)
+		If cAttrName = "Type" Then cAttrName = "TypeOf"
+		'this is a designer property
+		If classdesigner = "Yes" Then
+			DP.Append($"#DesignerProperty: Key: ${cAttrName}, DisplayName: ${cAttrName}, FieldType: ${classtype}, DefaultValue: ${defaultvalue} , Description: ${classdescription}"$)
+			'read the designer property
+			AddCode(RD, $"${varPrefix}${cAttrName} = Props.Get("${cAttrName}")"$)
+			'if we have a min & max value
+			If classoptions <> "" Then
+				DP.append($", List: ${classoptions}"$)
+			End If
+			'close this designer property
+			DP.append(CRLF)
+		End If
+		'define variable declaration
+		VD.append($"Private ${varPrefix}${cAttrName} As ${classtype}"$)
+		Select Case classtype
+			Case "String", "Int"
+				'add the class for building
+				AddCode(AA, $"AddClass(${varPrefix}${cAttrName})"$)
+			Case "Boolean"
+				Select Case classaddoncondition
+					Case "True", "False"
+						AddCode(AA, $"AddClassOnCondition("${classname}", ${varPrefix}${cAttrName}, ${classaddoncondition})"$)
+					Case "None"
+						AddCode(AA, $"AddClass("${classname}")"$)
+				End Select
+		End Select
+		'
+		Select Case classtype
+			Case "String"
+				VD.append($" = "${defaultvalue}""$)
+			Case "Boolean", "Int"
+				If defaultvalue <> "" Then
+					VD.append($" = ${defaultvalue}"$)
+				End If
+		End Select
+		'close the variable declaration
+		VD.append(CRLF)
+		'build gets and sets
+		'
+		If classhasset = "Yes" Then
+			If classdescription <> "" Then
+				AddComment(GS, "set " & classdescription)
+			Else
+				AddComment(GS, "set " & classname)
+			End If
+			prev.put(classname, classname)
+			AddCode(GS, $"public Sub set${cAttrName}(var${cAttrName} As ${classtype})"$)
+			Select Case classaddoncondition
+				Case "True", "False"
+					AddCode(GS, $"AddClassOnCondition("${classname}", var${cAttrName}, ${classaddoncondition})"$)
+				Case "None"
+					AddCode(GS, $"AddClass(var${cAttrName})"$)
+			End Select
+			AddCode(GS, $"${varPrefix}${cAttrName} = var${cAttrName}"$)
+			AddCode(GS, "End Sub")
+			AddNewLine(GS)
+		End If
+		'
+		If classhasget = "Yes" Then
+			If classdescription <> "" Then
+				AddComment(GS, "get " & classdescription)
+			Else
+				AddComment(GS, "get " & classname)
+			End If
+			AddCode(GS, $"public Sub get${cAttrName}() As ${classtype}"$)
+			AddCode(GS, $"Return ${varPrefix}${cAttrName}"$)
+			AddCode(GS, "End Sub")
+			AddNewLine(GS)
+		End If
+		'
+		'make coding easier
+		If classoptions <> "" Then
+			Dim lclassoptions As List = vm.strparse("|", classoptions)
+			For Each soption As String In lclassoptions
+				soption = soption.trim
+				If soption = "none" Then Continue
+				If prev.ContainsKey(soption) Then Continue
+				Dim boption As String = vm.BeautifyName(soption)
+				AddComment(GS, "add " & soption & " class")
+				AddCode(GS, $"public Sub set${boption}()"$)
+				AddCode(GS, $"AddClass("${soption}")"$)
+				AddCode(GS, "End Sub")
+				AddNewLine(GS)
+			Next
+		End If
+	Next
+	
+	
+	AddCode(DP, "'***** ATTRIBUTES *****")
+	AddNewLine(DP)
+	prev.Initialize 
 	For Each attr As Map In attributes
 		Dim attrdescription As String = attr.get("attrdescription")
+		attrdescription = attrdescription.trim
 		Dim attrdesigner As String = attr.get("attrdesigner")
 		Dim attrhasget As String = attr.get("attrhasget")
 		Dim attrhasset As String = attr.get("attrhasset")
 		Dim attrmax As String = attr.get("attrmax")
 		Dim attrmin As String = attr.get("attrmin")
 		Dim attrname As String = attr.get("attrname")
+		attrname = attrname.trim
 		Dim attroptions As String = attr.get("attroptions")
+		attroptions = attroptions.trim
+		attroptions = RemoveDuplicates(attroptions)
+		
 		Dim attroninit As String = attr.get("attroninit")
 		Dim attronsub As String = attr.get("attronsub")
 		Dim attrtype As String = attr.get("attrtype")
 		Dim defaultvalue As String = attr.Get("defaultvalue")
+		defaultvalue = defaultvalue.trim
+		Dim oncondition As String = attr.get("oncondition")
+		
 		If attrname = "undefined" Then Continue
-		If attrname.EqualsIgnoreCase("loremipsum") Then bLoremIpsum = True
-		'
+			'
 		attrtype = BANanoShared.BeautifyName(attrtype) 
 		If attrtype = "Boolean" And defaultvalue = "" Then
 			defaultvalue = "False"
@@ -178,19 +312,31 @@ Sub CreateCustomView As String
 			DP.Append($"#DesignerProperty: Key: ${bAttrName}, DisplayName: ${bAttrName}, FieldType: ${attrtype}, DefaultValue: ${defaultvalue} , Description: ${attrdescription}"$)
 			'read the designer property
 			AddCode(RD, $"${varPrefix}${bAttrName} = Props.Get("${bAttrName}")"$)
+			'if we have a min & max value
+			If attrmin <> "" Then DP.append($", MinRange: ${attrmin}"$)
+			If attrmax <> "" Then DP.append($", MaxRange: ${attrmax}"$)
+			If attroptions <> "" Then
+				DP.append($", List: ${attroptions}"$)
+			End If
+			'close this designer property
+			DP.append(CRLF)
 		End If
-		'if we have a min & max value
-		If attrmin <> "" Then DP.append($", MinRange: ${attrmin}"$)
-		If attrmax <> "" Then DP.append($", MaxRange: ${attrmax}"$)
-		If attroptions <> "" Then
-			DP.append($", List: ${attroptions}"$)
-		End If
-		'close this designer property
-		DP.append(CRLF)
+		
 		'define variable declaration
 		VD.append($"Private ${varPrefix}${bAttrName} As ${attrtype}"$)
-		'add the attribute for building
-		AddCode(AA, $"AddAttr("${attrname}", ${varPrefix}${bAttrName})"$)
+		
+		Select Case attrtype
+		Case "String", "Int"
+			'add the class for building
+			AddCode(AA, $"AddAttr("${attrname}", ${varPrefix}${bAttrName})"$)
+		Case "Boolean"
+			Select Case oncondition
+			Case "True", "False"
+				AddCode(AA, $"AddAttrOnCondition("${attrname}", ${varPrefix}${bAttrName}, ${oncondition})"$)
+			Case Else
+				AddCode(AA, $"AddAttr("${attrname}", ${varPrefix}${bAttrName})"$)
+			End Select
+		End Select
 		'
 		Select Case attrtype
 		Case "String"
@@ -207,10 +353,21 @@ Sub CreateCustomView As String
 		If attrhasset = "Yes" Then
 			If attrdescription <> "" Then
 				AddComment(GS, "set " & attrdescription)
+			Else
+				AddComment(GS, "set " & attrname)
 			End If
+			prev.put(attrname, attrname)
 			AddCode(GS, $"public Sub set${bAttrName}(var${bAttrName} As ${attrtype})"$)
-			AddCode(GS, $"AddAttr("${attrname}", var${bAttrName})"$)
+			Select Case oncondition
+			Case "True", "False"
+				AddCode(GS, $"AddAttrOnCondition("${attrname}", var${bAttrName}, ${oncondition})"$)
+			Case Else
+				AddCode(GS, $"AddAttr("${attrname}", var${bAttrName})"$)
+			End Select
 			AddCode(GS, $"${varPrefix}${bAttrName} = var${bAttrName}"$)
+			If attrname.Contains("loremipsum") Then
+				AddCode(GS, $"If var${bAttrName} Then setText(BANanoShared.LoremIpsum(1))"$)
+			End If
 			AddCode(GS, "End Sub")
 			AddNewLine(GS)
 		End If
@@ -218,26 +375,54 @@ Sub CreateCustomView As String
 		If attrhasget = "Yes" Then
 			If attrdescription <> "" Then
 				AddComment(GS, "get " & attrdescription)
+			Else
+				AddComment(GS, "get " & attrname)
 			End If
 			AddCode(GS, $"public Sub get${bAttrName}() As ${attrtype}"$)
 			AddCode(GS, $"Return ${varPrefix}${bAttrName}"$)
 			AddCode(GS, "End Sub")
 			AddNewLine(GS)
 		End If
+		'
+		'make coding easier
+		If attroptions <> "" Then
+			Dim lclassoptions As List = vm.strparse("|", attroptions)
+			For Each soption As String In lclassoptions
+				soption = soption.trim
+				If soption = "none" Then Continue
+				If prev.containsKey(soption) Then Continue
+				Dim boption As String = vm.BeautifyName(soption)
+				Dim bAttrName As String = vm.BeautifyName(attrname)
+				AddComment(GS, "add " & attrname & "-" & soption & " attribute")
+				AddCode(GS, $"public Sub set${bAttrName}${boption}()"$)
+				AddCode(GS, $"AddAttr("${attrname}", "${soption}")"$)
+				AddCode(GS, "End Sub")
+				AddNewLine(GS)
+			Next
+		End If
 	Next
 	'
+	AddCode(DP, "'***** STYLES *****")
+	AddNewLine(DP)
 	'coding the styles
+	prev.initialize
 	For Each style As Map In styles
 		Dim styledescription As String = style.get("styledescription")
+		styledescription = styledescription.trim
 		Dim styledesigner As String = style.get("styledesigner")
 		Dim stylehasget As String = style.get("stylehasget")
 		Dim stylehasset As String = style.get("stylehasset")
 		Dim stylename As String = style.get("stylename")
+		stylename = stylename.trim
 		Dim styleoptions As String = style.get("styleoptions")
+		styleoptions = styleoptions.trim
+		styleoptions = RemoveDuplicates(styleoptions)
+		
 		Dim styleoninit As String = style.get("styleoninit")
 		Dim styleonsub As String = style.get("styleonsub")
 		Dim styletype As String = style.get("styletype")
 		Dim defaultvalue As String = style.Get("defaultvalue")
+		defaultvalue = defaultvalue.trim
 		If stylename = "undefined" Then Continue
 		'
 		styletype = BANanoShared.BeautifyName(styletype)
@@ -255,11 +440,11 @@ Sub CreateCustomView As String
 			DP.Append($"#DesignerProperty: Key: ${sAttrName}, DisplayName: ${sAttrName}, FieldType: ${styletype}, DefaultValue: ${defaultvalue} , Description: ${styledescription}"$)
 			'read the designer property
 			AddCode(RD, $"${varPrefix}${sAttrName} = Props.Get("${sAttrName}")"$)
-		End If
-		'if we have a min & max value
-		If styleoptions <> "" Then
-			DP.append($", List: ${styleoptions}"$)
-		End If
+			'if we have a min & max value
+			If styleoptions <> "" Then
+				DP.append($", List: ${styleoptions}"$)
+			End If
+		End If 
 		'close this designer property
 		DP.append(CRLF)
 		'define variable declaration
@@ -282,7 +467,10 @@ Sub CreateCustomView As String
 		If stylehasset = "Yes" Then
 			If styledescription <> "" Then
 				AddComment(GS, "set " & styledescription)
+			Else
+				AddComment(GS, "set " & stylename)
 			End If
+			prev.put(stylename, stylename)
 			AddCode(GS, $"public Sub set${sAttrName}(var${sAttrName} As ${styletype})"$)
 			AddCode(GS, $"AddStyle("${stylename}", var${sAttrName})"$)
 			AddCode(GS, $"${varPrefix}${sAttrName} = var${sAttrName}"$)
@@ -293,99 +481,33 @@ Sub CreateCustomView As String
 		If stylehasget = "Yes" Then
 			If styledescription <> "" Then
 				AddComment(GS, "get " & styledescription)
+			Else
+				AddComment(GS, "get " & stylename)
 			End If
 			AddCode(GS, $"public Sub get${sAttrName}() As ${styletype}"$)
 			AddCode(GS, $"Return ${varPrefix}${sAttrName}"$)
 			AddCode(GS, "End Sub")
 			AddNewLine(GS)
 		End If
+		'
+		'make coding easier
+		If styleoptions <> "" Then
+			Dim lclassoptions As List = vm.strparse("|", styleoptions)
+			For Each soption As String In lclassoptions
+				soption = soption.trim
+				If soption = "none" Then Continue
+				If prev.ContainsKey(soption) Then Continue
+				Dim boption As String = vm.BeautifyName(soption)
+				Dim sAttrName As String = vm.BeautifyName(stylename)
+				AddComment(GS, "add " & attrname & "-" & soption & " style")
+				AddCode(GS, $"public Sub set${sAttrName}${boption}()"$)
+				AddCode(GS, $"AddStyle("${stylename}", "${soption}")"$)
+				AddCode(GS, "End Sub")
+				AddNewLine(GS)
+			Next
+		End If		
 	Next
-	'process classes
-	For Each class As Map In classes
-		Dim classdescription As String = class.get("classdescription")
-		Dim classdesigner As String = class.get("classdesigner")
-		Dim classhasget As String = class.get("classhasget")
-		Dim classhasset As String = class.get("classhasset")
-		Dim classname As String = class.get("classname")
-		Dim classoptions As String = class.get("classoptions")
-		Dim classoninit As String = class.get("classoninit")
-		Dim classonsub As String = class.get("classonsub")
-		Dim classtype As String = class.get("classtype")
-		Dim defaultvalue As String = class.Get("defaultvalue")
-		Dim classaddoncondition As String = class.get("classaddoncondition")
-		If classname = "undefined" Then Continue
-		'
-		classtype = BANanoShared.BeautifyName(classtype)
-		If classtype = "Boolean" And defaultvalue = "" Then
-			defaultvalue = "False"
-		End If
-		Dim varPrefix As String = BANanoShared.LeftString(classtype, 2)
-		varPrefix = varPrefix.tolowercase
-		
-		'
-		'beautify the class name
-		Dim cAttrName As String = vm.BeautifyName(classname)
-		If cAttrName = "Type" Then cAttrName = "TypeOf"
-		'this is a designer property
-		If classdesigner = "Yes" Then
-			DP.Append($"#DesignerProperty: Key: ${cAttrName}, DisplayName: ${cAttrName}, FieldType: ${classtype}, DefaultValue: ${defaultvalue} , Description: ${classdescription}"$)
-			'read the designer property
-			AddCode(RD, $"${varPrefix}${cAttrName} = Props.Get("${cAttrName}")"$)
-		End If
-		'if we have a min & max value
-		If classoptions <> "" Then
-			DP.append($", List: ${classoptions}"$)
-		End If
-		'close this designer property
-		DP.append(CRLF)
-		'define variable declaration
-		VD.append($"Private ${varPrefix}${cAttrName} As ${classtype}"$)
-		Select Case classtype
-		Case "String", "Int"
-			'add the class for building
-			AddCode(AA, $"AddClass(${varPrefix}${cAttrName})"$)
-		Case "Boolean"
-			Select Case classaddoncondition
-			Case "True", "False"
-				AddCode(AA, $"AddClassOnCondition("${classname}", ${varPrefix}${cAttrName}, ${classaddoncondition})"$)
-			Case "None"
-				AddCode(AA, $"AddClass("${classname}")"$)
-			End Select
-		End Select
-		'
-		Select Case classtype
-			Case "String"
-				VD.append($" = "${defaultvalue}""$)
-			Case "Boolean", "Int"
-				If defaultvalue <> "" Then
-					VD.append($" = ${defaultvalue}"$)
-				End If
-		End Select
-		'close the variable declaration
-		VD.append(CRLF)
-		'build gets and sets
-		'
-		If classhasset = "Yes" Then
-			If classdescription <> "" Then
-				AddComment(GS, "set " & classdescription)
-			End If
-			AddCode(GS, $"public Sub set${cAttrName}(var${cAttrName} As ${classtype})"$)
-			AddCode(GS, $"AddClass(var${cAttrName})"$)
-			AddCode(GS, $"${varPrefix}${cAttrName} = var${cAttrName}"$)
-			AddCode(GS, "End Sub")
-			AddNewLine(GS)
-		End If
-		'
-		If classhasget = "Yes" Then
-			If classdescription <> "" Then
-				AddComment(GS, "get " & classdescription)
-			End If
-			AddCode(GS, $"public Sub get${cAttrName}() As ${classtype}"$)
-			AddCode(GS, $"Return ${varPrefix}${cAttrName}"$)
-			AddCode(GS, "End Sub")
-			AddNewLine(GS)
-		End If
-	Next
+	'
 	
 	
 	'update the code
@@ -405,7 +527,7 @@ Sub CreateCustomView As String
 	AddCode(CV, $"Private mClasses As String = """$)
 	AddCode(CV, $"Private mStyle As String = """$)
 	AddCode(CV, $"Private mAttributes As String = """$)
-	AddCode(CV, $"Private mCaption As String = """$)
+	AddCode(CV, $"Private mText As String = """$)
 	AddCode(CV, $"Private classList As Map"$)
 	AddCode(CV, $"Private styleList As Map"$)
 	AddCode(CV, $"Private attributeList As Map"$)
@@ -413,10 +535,7 @@ Sub CreateCustomView As String
 	AddCode(CV, "Private sbText As StringBuilder")
 	If projectvue = "Yes" Then
 		AddCode(CV, "Private mStates As String")
-	End If
-	'this is a vue project
-	AddCode(CV, $"Public bindings As Map"$)
-	If projectvue = "Yes" Then
+		AddCode(CV, $"Public bindings As Map"$)
 		AddCode(CV, $"Public methods As Map"$)
 	End If
 	CV.append(VD.tostring)
@@ -448,7 +567,7 @@ Sub CreateCustomView As String
 	AddCode(CV, $"mClasses = Props.Get("Classes")"$)
 	AddCode(CV, $"mAttributes = Props.Get("Attributes")"$)
 	AddCode(CV, $"mStyle = Props.Get("Style")"$)
-	AddCode(CV, $"mCaption = Props.Get("Caption")"$)
+	AddCode(CV, $"mText = Props.Get("Text")"$)
 	'
 	If projectvue = "Yes" Then
 		AddCode(CV, $"mStates = Props.Get("States")"$)
@@ -472,9 +591,6 @@ Sub CreateCustomView As String
 		AddComment(CV, "link the events, if any")
 		AddCode(CV, EC.ToString)
 	End If
-	If bLoremIpsum Then	
-		AddCode(CV, "If boLoremipsum Then setCaption(BANanoShared.LoremIpsum(1))")
-	End If
 	AddComment(CV, "build and get the element")
 	AddCode(CV, $"Dim strHTML As String = ToString"$)
 	AddCode(CV, $"mElement = mTarget.Append(strHTML).Get("#" & mName)"$)
@@ -496,7 +612,7 @@ Sub CreateCustomView As String
 	AddComment(CV, "build element internal structure")
 	AddCode(CV, $"Dim iStructure As String = BANanoShared.BuildAttributes(attributeList)"$)
 	AddCode(CV, "iStructure = iStructure.trim")
-	Dim cvCode As String = $"Dim rslt As String = ~"<~{mTagName} id="~{mName}" ~{iStructure}>~{mCaption}~{sbText.ToString}</~{mTagName}>"~"$
+	Dim cvCode As String = $"Dim rslt As String = ~"<~{mTagName} id="~{mName}" ~{iStructure}>~{mText}~{sbText.ToString}</~{mTagName}>"~"$
 	cvCode = cvCode.replace("~", "$")
 	AddCode(CV, cvCode)
 	AddCode(CV, "Return rslt")
@@ -697,6 +813,7 @@ Sub CreateCustomView As String
 	AddCode(CV, $"If BANano.IsNumber(varClass) Then varClass = BANanoShared.CStr(varClass)"$)
 	AddCode(CV, $"varClass = varClass.trim"$)
 	AddCode(CV, $"if varClass = "" Then Return"$)
+	AddCode(CV, $"if varClass = "none" Then Return"$)
 	AddCode(CV, $"If mElement <> Null Then mElement.AddClass(varClass)"$)
 	AddCode(CV, $"Dim mxItems As List = BANanoShared.StrParse(" ", varClass)"$)
 	AddCode(CV, $"For Each mt As String In mxItems"$)
@@ -712,6 +829,7 @@ Sub CreateCustomView As String
 	AddCode(CV, $"If BANano.IsNumber(varClass) Then varClass = BANanoShared.CStr(varClass)"$)
 	AddCode(CV, $"varClass = varClass.trim"$)
 	AddCode(CV, $"if varClass = "" Then Return"$)
+	AddCode(CV, $"if varClass = "none" Then Return"$)
 	AddCode(CV, $"If mElement <> Null Then mElement.AddClass(varClass)"$)
 	AddCode(CV, $"Dim mxItems As List = BANanoShared.StrParse(" ", varClass)"$)
 	AddCode(CV, $"For Each mt As String In mxItems"$)
@@ -723,6 +841,7 @@ Sub CreateCustomView As String
 	AddCode(CV, "public Sub AddStyle(varProp As string, varStyle As String)")
 	AddCode(CV, $"If BANano.IsUndefined(varStyle) Or BANano.IsNull(varStyle) Then Return"$)
 	AddCode(CV, $"If BANano.IsNumber(varStyle) Then varStyle = BANanoShared.CStr(varStyle)"$)
+	AddCode(CV, $"if varStyle = "none" Then Return"$)
 	AddCode(CV, "If mElement <> Null Then")
 	AddCode(CV, "Dim aStyle As Map = CreateMap()")
 	AddCode(CV, "aStyle.put(varProp, varStyle)")
@@ -733,7 +852,7 @@ Sub CreateCustomView As String
 	AddCode(CV, "End Sub")
 	AddNewLine(CV)
 	'
-	
+	If projectvue = "Yes" Then	
 	AddCode(CV, $"'add an attribute"$)
 AddCode(CV, $"Public Sub AddAttr(varProp As String, varValue As String)
 If BANano.IsUndefined(varValue) Or BANano.IsNull(varValue) Then Return
@@ -768,7 +887,27 @@ End If
 End If
 Return
 End Sub"$)
+	Else
+		AddCode(CV, $"'add an attribute"$)
+		AddCode(CV, $"Public Sub AddAttr(varProp As String, varValue As String)"$)
+		AddCode(CV, $"If BANano.IsUndefined(varValue) Or BANano.IsNull(varValue) Then Return
+	If BANano.IsNumber(varValue) Then varValue = BANanoShared.CStr(varValue)
+	If varValue = "none" Then Return
+	attributeList.put(varProp, varValue)
+	If mElement <> Null Then mElement.SetAttr(varProp, varValue)"$)
+		AddCode(CV, "End Sub")
+		AddCode(CV, "")
+	End If
 	'
+	AddComment(CV, "add attr on condition")
+	AddCode(CV, $"public Sub AddAttrOnCondition(varProp As String, varCondition As Boolean, varShouldBe As boolean)"$)
+	AddCode(CV, $"If BANano.IsUndefined(varProp) Or BANano.IsNull(varProp) Then Return"$)
+	AddCode(CV, $"If BANano.IsUndefined(varCondition) Or BANano.IsNull(varCondition) Then Return"$)
+	AddCode(CV, $"if varShouldBe <> varCondition Then Return"$)
+	AddCode(CV, $"AddAttr(varProp, varCondition)"$)
+	AddCode(CV, "End Sub")
+	AddNewLine(CV)
+		
 	AddNewLine(CV)
 	AddComment(CV, "returns the class names")
 	AddCode(CV, "Public Sub getClasses() As String")
@@ -812,10 +951,14 @@ End Sub"$)
 	AddNewLine(CV)
 	AddComment(CV, "sets the attributes")
 	AddCode(CV, "public Sub setAttributes(varAttributes As String)")
+	AddCode(CV, $"If varAttributes.IndexOf("=") >= 0 Then varAttributes = varAttributes.Replace("=",":")"$)
+	If projectvue <> "Yes" Then
+		AddCode(CV, $"If varAttributes.IndexOf(",") >= 0 Then varAttributes = varAttributes.Replace(",",";")"$)
+	End If
 	AddCode(CV, $"Dim mxItems As List = BANanoShared.StrParse(";", varAttributes)"$)
 	AddCode(CV, $"For Each mt As String In mxItems"$)
-	AddCode(CV, $"Dim k As String = BANanoShared.MvField(mt,1,"=")"$)
-	AddCode(CV, $"Dim v As String = BANanoShared.MvField(mt,2,"=")"$)
+	AddCode(CV, $"Dim k As String = BANanoShared.MvField(mt,1,":")"$)
+	AddCode(CV, $"Dim v As String = BANanoShared.MvField(mt,2,":")"$)
 	AddCode(CV, $"If mElement <> Null Then mElement.SetAttr(k, v)"$)
 	AddCode(CV, $"attributeList.put(k, v)"$)
 	AddCode(CV, "Next")
@@ -825,7 +968,11 @@ End Sub"$)
 	
 	AddComment(CV, "sets the styles from the designer")
 	AddCode(CV, "public Sub setStyles(varStyles As String)")
-	AddCode(CV, $"Dim mxItems As List = BANanoShared.StrParse(",", varStyles)"$)
+	AddCode(CV, $"If varStyles.IndexOf("=") >= 0 Then varStyles = varStyles.Replace("=",":")"$)
+	If projectvue <> "Yes" Then
+		AddCode(CV, $"If varStyles.IndexOf(",") >= 0 Then varStyles = varStyles.Replace(",",";")"$)
+	End If
+	AddCode(CV, $"Dim mxItems As List = BANanoShared.StrParse(";", varStyles)"$)
 	AddCode(CV, $"For Each mt As String In mxItems"$)
 	AddCode(CV, $"Dim k As String = BANanoShared.MvField(mt,1,":")"$)
 	AddCode(CV, $"Dim v As String = BANanoShared.MvField(mt,2,":")"$)
@@ -846,17 +993,17 @@ End Sub"$)
 	AddCode(CV, $"Return mAttributes"$)
 	AddCode(CV, "End Sub")
 	AddNewLine(CV)
-	AddComment(CV, "sets the caption")
-	AddCode(CV, "public Sub setCaption(varCaption As String)")
+	AddComment(CV, "sets the text")
+	AddCode(CV, "public Sub setText(varText As String)")
 	AddCode(CV, "If mElement <> Null Then")
-	AddCode(CV, "mElement.SetHTML(BANano.SF(varCaption))")
+	AddCode(CV, "mElement.SetHTML(BANano.SF(varText))")
 	AddCode(CV, "End If")
-	AddCode(CV, "mCaption = varCaption")
+	AddCode(CV, "mText = varText")
 	AddCode(CV, "End Sub")
 	AddNewLine(CV)
-	AddComment(CV, "returns the caption")
-	AddCode(CV, "public Sub getCaption() As String")
-	AddCode(CV, "Return mCaption")
+	AddComment(CV, "returns the text")
+	AddCode(CV, "public Sub getText() As String")
+	AddCode(CV, "Return mText")
 	AddCode(CV, "End Sub")
 	AddNewLine(CV)
 	CV.append(GS.tostring)
@@ -903,3 +1050,22 @@ private Sub AddCodeInline(sbx As StringBuilder, xcode As String)
 	xcode = xcode.replace("~","$")
 	sbx.Append(xcode)
 End Sub
+
+Sub RemoveDuplicates(soptions As String) As String
+	If soptions = "" Then Return ""
+	Dim lclassoptions As List = vm.strparse("|", soptions)
+	Dim nm As Map = CreateMap()
+	For Each soption As String In lclassoptions
+		soption = soption.trim
+		nm.put(soption, soption)
+	Next
+	Dim nl As List
+	nl.initialize
+	For Each k As String In nm.keys
+		nl.add(k)
+	Next
+	nl.sort(True)
+	Dim sout As String = BANanoShared.Join("|", nl)
+	Return sout
+End Sub
+

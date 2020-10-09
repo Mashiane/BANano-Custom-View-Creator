@@ -16,6 +16,7 @@ Sub Init
 	'initialize the page
 	vm.Initialize(Me, Main.appname)
 	vue = vm.vue
+	vue.ShowWarnings = False
 	BuildNavBar
 	BuildNavDrawer
 	AddPages
@@ -67,7 +68,7 @@ Sub BuildNavBar
 	vm.NavBar.Title.SetOnClick(Me, "title_click")
 	vm.NavBar.AddTitle("BANano Custom View Creator","")
 	vm.navbar.SubHeading.AddClass("white--text")
-	vm.NavBar.AddSubHeading1("1.00")
+	vm.NavBar.AddSubHeading1(Main.version)
 	vm.NavBar.AddSpacer
 	vm.NavBar.SetFixed(True)
 	vm.NavBar.SetVisible(True)
