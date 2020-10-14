@@ -134,7 +134,11 @@ Sub CreateCustomView As String
 	Next
 	AddNewLine(CV)
 	'
-	AddCode(DP, $"#DesignerProperty: Key: Text, DisplayName: Text, FieldType: String, DefaultValue: , Description: Text on the element"$)
+	If projectvue = "Yes" Then
+		AddCode(DP, $"#DesignerProperty: Key: Caption, DisplayName: Caption, FieldType: String, DefaultValue: , Description: Text on the element"$)
+	Else
+		AddCode(DP, $"#DesignerProperty: Key: Text, DisplayName: Text, FieldType: String, DefaultValue: , Description: Text on the element"$)
+	End If
 	AddCode(DP, $"#DesignerProperty: Key: Classes, DisplayName: Classes, FieldType: String, DefaultValue: , Description: Classes added to the HTML tag."$)
 	AddCode(DP, $"#DesignerProperty: Key: Style, DisplayName: Style, FieldType: String, DefaultValue: , Description: Styles added to the HTML tag. Must be a json String."$)
 	AddCode(DP, $"#DesignerProperty: Key: Attributes, DisplayName: Attributes, FieldType: String, DefaultValue: , Description: Attributes added to the HTML tag. Must be a json String."$)
@@ -527,7 +531,11 @@ Sub CreateCustomView As String
 	AddCode(CV, $"Private mClasses As String = """$)
 	AddCode(CV, $"Private mStyle As String = """$)
 	AddCode(CV, $"Private mAttributes As String = """$)
-	AddCode(CV, $"Private mText As String = """$)
+	If projectvue = "Yes" Then
+		AddCode(CV, $"Private mCaption As String = """$)
+	Else
+		AddCode(CV, $"Private mText As String = """$)
+	End If
 	AddCode(CV, $"Private classList As Map"$)
 	AddCode(CV, $"Private styleList As Map"$)
 	AddCode(CV, $"Private attributeList As Map"$)
@@ -567,7 +575,11 @@ Sub CreateCustomView As String
 	AddCode(CV, $"mClasses = Props.Get("Classes")"$)
 	AddCode(CV, $"mAttributes = Props.Get("Attributes")"$)
 	AddCode(CV, $"mStyle = Props.Get("Style")"$)
-	AddCode(CV, $"mText = Props.Get("Text")"$)
+	If projectvue = "Yes" Then
+		AddCode(CV, $"mCaption = Props.Get("Caption")"$)
+	Else
+		AddCode(CV, $"mText = Props.Get("Text")"$)
+	End If
 	'
 	If projectvue = "Yes" Then
 		AddCode(CV, $"mStates = Props.Get("States")"$)
@@ -614,6 +626,9 @@ Sub CreateCustomView As String
 	AddCode(CV, "iStructure = iStructure.trim")
 	Dim cvCode As String = $"Dim rslt As String = ~"<~{mTagName} id="~{mName}" ~{iStructure}>~{mText}~{sbText.ToString}</~{mTagName}>"~"$
 	cvCode = cvCode.replace("~", "$")
+	If projectvue = "Yes" Then
+		cvCode = cvCode.replace("mText", "mCaption")
+	End If
 	AddCode(CV, cvCode)
 	AddCode(CV, "Return rslt")
 	AddCode(CV, "End Sub")
@@ -993,18 +1008,33 @@ End Sub"$)
 	AddCode(CV, $"Return mAttributes"$)
 	AddCode(CV, "End Sub")
 	AddNewLine(CV)
-	AddComment(CV, "sets the text")
-	AddCode(CV, "public Sub setText(varText As String)")
-	AddCode(CV, "If mElement <> Null Then")
-	AddCode(CV, "mElement.SetHTML(BANano.SF(varText))")
-	AddCode(CV, "End If")
-	AddCode(CV, "mText = varText")
-	AddCode(CV, "End Sub")
-	AddNewLine(CV)
-	AddComment(CV, "returns the text")
-	AddCode(CV, "public Sub getText() As String")
-	AddCode(CV, "Return mText")
-	AddCode(CV, "End Sub")
+	If projectvue = "Yes" Then
+		AddComment(CV, "sets the caption")
+		AddCode(CV, "public Sub setCaption(varText As String)")
+		AddCode(CV, "If mElement <> Null Then")
+		AddCode(CV, "mElement.SetHTML(BANano.SF(varText))")
+		AddCode(CV, "End If")
+		AddCode(CV, "mCaption = varText")
+		AddCode(CV, "End Sub")
+		AddNewLine(CV)
+		AddComment(CV, "returns the text")
+		AddCode(CV, "public Sub getCaption() As String")
+		AddCode(CV, "Return mCaption")
+		AddCode(CV, "End Sub")
+	Else
+		AddComment(CV, "sets the text")
+		AddCode(CV, "public Sub setText(varText As String)")
+		AddCode(CV, "If mElement <> Null Then")
+		AddCode(CV, "mElement.SetHTML(BANano.SF(varText))")
+		AddCode(CV, "End If")
+		AddCode(CV, "mText = varText")
+		AddCode(CV, "End Sub")
+		AddNewLine(CV)
+		AddComment(CV, "returns the text")
+		AddCode(CV, "public Sub getText() As String")
+		AddCode(CV, "Return mText")
+		AddCode(CV, "End Sub")
+	End If
 	AddNewLine(CV)
 	CV.append(GS.tostring)
 	AddNewLine(CV)

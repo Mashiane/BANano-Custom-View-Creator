@@ -957,6 +957,7 @@ End Sub
 Sub btnGlobalEvents_click(e As BANanoEvent)
 	Dim mproject As Map = vm.GetData("project")
 	Dim mcomponent As Map =	vm.GetData("component")
+	Dim cprojectvue As String = mproject.getdefault("projectvue", "")
 	If BANano.IsNull(mproject) Or BANano.IsNull(mcomponent) Then Return
 	vm.ShowLoading
 	'
@@ -993,6 +994,10 @@ Sub btnGlobalEvents_click(e As BANanoEvent)
 	"blur", "focus", "input", "submit", "keypress", "keyup", "dblclick", "mousedown", "mousemove", _
 	"mouseup", "drag", "dragend", "dragenter", "dragleave", "dragover", "dragstart", "drop", "unload"))
 	'
+	If cprojectvue = "Yes" Then
+		styles2add.add("click.stop")	
+	End If
+	
 	'do a search for each style
 	For Each styleName As String In styles2add
 		If mstylename.ContainsKey(styleName) Then Continue
