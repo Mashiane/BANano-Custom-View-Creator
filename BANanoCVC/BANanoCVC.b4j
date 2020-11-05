@@ -50,7 +50,7 @@ Sub Process_Globals
 	Public AppTitle As String = "BANano Custom View Creator"
 	Private Publish As String = "C:\laragon\www"
 	Public ServerIP As String = "localhost"
-	Public Version As String = "1.7"
+	Public Version As String = "1.8"
 	Public Port As String = "8080"
 End Sub
 

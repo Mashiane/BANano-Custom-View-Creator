@@ -346,7 +346,7 @@ Sub CreateDataTable_projects
 	dtprojects.SetEdit(True)
 	dtprojects.SetDelete(True)
 	dtprojects.SetMenu(True)
-	dtprojects.AddAction("compile", "Compile", "mdi-cog")
+	dtprojects.AddAction("compile", "Compile", "mdi-cogs")
 	dtprojects.SetIconDimensions1("edit", "24px", "success","80")
 	dtprojects.SetIconDimensions1("delete", "24px", "error","80")
 	dtprojects.SetIconDimensions1("menu", "24px", "orange","80")

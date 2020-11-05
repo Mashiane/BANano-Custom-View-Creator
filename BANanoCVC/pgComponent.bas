@@ -338,15 +338,15 @@ Sub CreateContainer_tabAttributes As VMContainer
 	dtattributes.SetTitle("Attributes")
 	dtattributes.SetSearchbox(True)
 	dtattributes.AddDivider
-	dtattributes.CardTitle.AddFab("btnRefreshAttributes", "mdi-reload", "magenta", "",  "Reload attributes","")
+	dtattributes.CardTitle.AddIcon3("btnRefreshAttributes", "mdi-reload", "magenta", "Reload attributes")
 	dtattributes.AddDivider
-	dtattributes.CardTitle.AddFab("btnReplicate", "mdi-content-duplicate", "cyan", "",  "Do everything on others","")
+	dtattributes.CardTitle.AddIcon3("btnReplicate", "mdi-content-copy", "cyan", "Do everything on others")
 	dtattributes.AddDivider
-	dtattributes.CardTitle.AddFab("btnGlobalAttributes", "playlist_add", "purple", "",  "Add global attributes","")
+	dtattributes.CardTitle.AddIcon3("btnGlobalAttributes", "mdi-view-grid-plus", "purple", "Add global attributes")
 	dtattributes.AddDivider
-	dtattributes.CardTitle.AddFab("btnGlobalAttributesR", "mdi-delete-circle-outline", "red", "",  "Remove global attributes","")
+	dtattributes.CardTitle.AddIcon3("btnGlobalAttributesR", "mdi-delete", "red", "Remove global attributes")
 	dtattributes.AddDivider
-	dtattributes.CardTitle.AddFab("btnVuejs", "mdi-vuejs", "blue", "", "Add VueJS attributes", "")
+	dtattributes.CardTitle.AddIcon3("btnVuejs", "mdi-vuejs", "blue", "Add VueJS attributes")
 	dtattributes.AddDivider
 	dtattributes.SetAddNew("btnNewAttributes", "mdi-plus", "Add a new attribute")
 	dtattributes.SetItemsperpage("1000")
@@ -621,11 +621,11 @@ Sub CreateContainer_tabStyles As VMContainer
 	dtstyles.SetTitle("Styles")
 	dtstyles.SetSearchbox(True)
 	dtstyles.AddDivider
-	dtstyles.CardTitle.AddFab("btnRefreshStyles", "mdi-reload", "magenta", "",  "Reload styles","")
+	dtstyles.CardTitle.AddIcon3("btnRefreshStyles", "mdi-reload", "magenta", "Reload styles")
 	dtstyles.AddDivider
-	dtstyles.CardTitle.AddFab("btnAddMarginsPadding", "playlist_add", "cyan", "",  "Add global styles","")
+	dtstyles.CardTitle.AddIcon3("btnAddMarginsPadding", "mdi-view-grid-plus", "cyan", "Add global styles")
 	dtstyles.AddDivider
-	dtstyles.CardTitle.AddFab("btnAddMarginsPaddingR", "mdi-delete-circle-outline", "red", "",  "Remove global styles","")
+	dtstyles.CardTitle.AddIcon3("btnAddMarginsPaddingR", "mdi-delete", "red",  "Remove global styles")
 	dtstyles.AddDivider
 	dtstyles.SetAddNew("btnNewStyle", "mdi-plus", "Add a new style")
 	dtstyles.SetItemsperpage("1000")
@@ -881,9 +881,9 @@ Sub CreateContainer_tabClasses As VMContainer
 	dtclasses.SetTitle("Classes")
 	dtclasses.SetSearchbox(True)
 	dtclasses.AddDivider
-	dtclasses.CardTitle.AddFab("btnRefreshClasses", "mdi-reload", "magenta", "",  "Reload classes","")
+	dtclasses.CardTitle.AddIcon3("btnRefreshClasses", "mdi-reload", "magenta", "Reload classes")
 	dtclasses.Adddivider
-	dtclasses.SetAddNew("btnNewClasse", "mdi-plus", "Add a new classe")
+	dtclasses.SetAddNew("btnNewClasse", "mdi-plus", "Add a new class")
 	dtclasses.SetItemsperpage("100")
 	dtclasses.SetMobilebreakpoint("600")
 	dtclasses.SetMultisort(True)
@@ -995,7 +995,18 @@ Sub btnGlobalEvents_click(e As BANanoEvent)
 	"mouseup", "drag", "dragend", "dragenter", "dragleave", "dragover", "dragstart", "drop", "unload"))
 	'
 	If cprojectvue = "Yes" Then
-		styles2add.add("click.stop")	
+		styles2add.add("click.stop")
+		styles2add.add("click.prevent")
+		styles2add.add("click.native")
+		styles2add.add("keyup.enter")
+		styles2add.add("keyup.tab")
+		styles2add.add("keyup.delete")
+		styles2add.add("keyup.esc")
+		styles2add.add("keyup.space")
+		styles2add.add("keyup.up")
+		styles2add.add("keyup.down")
+		styles2add.add("keyup.left")
+		styles2add.add("keyup.right")
 	End If
 	
 	'do a search for each style
@@ -1068,9 +1079,9 @@ Sub CreateContainer_tabEvents As VMContainer
 	dtevents.SetTitle("Events")
 	dtevents.SetSearchbox(True)
 	dtevents.AddDivider
-	dtevents.CardTitle.AddFab("btnGlobalEvents", "playlist_add", "orange", "",  "Add global events","")
+	dtevents.CardTitle.AddIcon3("btnGlobalEvents", "mdi-view-grid-plus", "orange", "Add global events")
 	dtevents.AddDivider
-	dtevents.CardTitle.AddFab("btnGlobalEventsR", "mdi-delete-circle-outline", "red", "",  "Remove global events","")
+	dtevents.CardTitle.AddIcon3("btnGlobalEventsR", "mdi-delete", "red", "Remove global events")
 	dtevents.AddDivider
 	dtevents.SetAddNew("btnNewEvents", "mdi-plus", "Add a new events")
 	dtevents.SetItemsperpage("100")

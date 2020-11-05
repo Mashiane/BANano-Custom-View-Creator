@@ -35,7 +35,7 @@ Sub BuildFooter
 	'*copy code after this line
 	vm.Footer.SHow
 	vm.Footer.SetFixed(True)
-	vm.Footer.SetColor("indigo")
+	vm.Footer.SetColor(vm.COLOR_LIGHTBLUE)
 	vm.footer.Container.SetTag("div")
 	vm.footer.Container.AddRows(1).AddColumns12
 	vm.Footer.Container.SetAttrRC(1, 0, "align", "center")
@@ -72,7 +72,7 @@ Sub BuildNavBar
 	vm.NavBar.AddSpacer
 	vm.NavBar.SetFixed(True)
 	vm.NavBar.SetVisible(True)
-	vm.NavBar.SetColor("indigo")
+	vm.NavBar.SetColor(vm.COLOR_LIGHTBLUE)
 	vm.navbar.Progress.SetColor(vm.COLOR_ORANGE)
 	'
 	Dim lblBy As VMLabel
